@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KPI Intelligence Reporter</title>
+    <link rel="stylesheet" href="styles.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- PapaParse for native CSV parsing -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <!-- Marked for Markdown to HTML conversion -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- Chart.js for Dashboards -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="background-blobs">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+    </div>
+
+    <div class="app-container">
+        <header>
+            <div class="logo">
+                <span class="logo-icon">📈</span>
+                <h1>KPI Intelligence Reporter</h1>
+            </div>
+            <p>Upload data, manage metrics, and generate an AI-powered Executive Decision Memo.</p>
+        </header>
+
+        <div class="glass-panel">
+            <div class="tabs">
+                <button class="tab-btn active" data-tab="data-management">🗄️ Data Management</button>
+                <button class="tab-btn" data-tab="report-view">📝 Executive Memo</button>
+            </div>
+
+            <!-- Tab Content: Data Management -->
+            <div id="data-management" class="tab-content active">
+                <div class="grid-layout">
+                    <!-- Marketing Section -->
+                    <div class="card">
+                        <h3>Marketing Performance</h3>
+                        <div class="upload-area">
+                            <label for="marketing-upload" class="upload-btn">Choose CSV File</label>
+                            <input type="file" id="marketing-upload" accept=".csv" hidden>
+                            <span id="marketing-file-name" class="file-name">No file chosen</span>
+                        </div>
+                        <div class="table-container" id="marketing-table-container"></div>
+                        <button class="action-btn outline-btn" id="add-marketing-row">+ Add Row</button>
+                    </div>
+
+                    <!-- Product Section -->
+                    <div class="card">
+                        <h3>Product Sales</h3>
+                        <div class="upload-area">
+                            <label for="product-upload" class="upload-btn">Choose CSV File</label>
+                            <input type="file" id="product-upload" accept=".csv" hidden>
+                            <span id="product-file-name" class="file-name">No file chosen</span>
+                        </div>
+                        <div class="table-container" id="product-table-container"></div>
+                        <button class="action-btn outline-btn" id="add-product-row">+ Add Row</button>
+                    </div>
+                </div>
+
+                <div class="action-bar" style="display: flex; flex-direction: column; align-items: center; gap: 15px; margin-top: 40px;">
+                    <textarea id="business-question" placeholder="Enter your business question (e.g. Which channel should I prioritize?)" style="width: 100%; max-width: 600px; padding: 12px; border-radius: 8px; border: 1px solid #cbd5e1; font-family: inherit; resize: vertical; min-height: 80px;"></textarea>
+                    <button id="generate-btn" class="action-btn primary-btn pulse-animation">
+                        ✨ Generate AI Multi-Agent Report
+                    </button>
+                </div>
+            </div>
+
+            <!-- Tab Content: Report -->
+            <div id="report-view" class="tab-content">
+                <div id="loading-state" class="hidden">
+                    <div class="spinner"></div>
+                    <p>Analyzing data and drafting memo... Please wait.</p>
+                </div>
+                <div id="error-state" class="hidden"></div>
+                <div id="report-content" class="memo-content">
+                    <div class="empty-state">No report generated yet. Go to Data Management and click 'Generate'.</div>
+                </div>
+                <div id="dashboards-container" class="hidden" style="margin-top: 30px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div class="card" style="padding: 15px;">
+                        <h3 style="text-align: center;">Before AI (Current state)</h3>
+                        <canvas id="beforeChart"></canvas>
+                    </div>
+                    <div class="card" style="padding: 15px;">
+                        <h3 style="text-align: center;">After AI (Projected ROI)</h3>
+                        <canvas id="afterChart"></canvas>
+                    </div>
+                </div>
+
+                <div id="pdf-download-container" style="text-align: center; margin-top: 30px;" class="hidden">
+                    <a id="download-pdf-btn" href="#" target="_blank" class="action-btn primary-btn" style="text-decoration: none; display: inline-block; margin-bottom: 20px;">
+                        📥 Download Full Executive PDF Report
+                    </a>
+                    
+                    <div id="social-share-container" style="display: flex; justify-content: center; gap: 15px; margin-top: 10px;">
+                        <button id="share-whatsapp" class="action-btn outline-btn" style="border-color: #25D366; color: #25D366;">📱 Share on WhatsApp</button>
+                        <button id="share-email" class="action-btn outline-btn">📧 Share via Email</button>
+                        <button id="share-copy" class="action-btn outline-btn">📋 Copy Link</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+
+    <script src="script.js?v=2"></script>
+</body>
+</html>
