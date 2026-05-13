@@ -1,3 +1,9 @@
+// Configuration
+// IMPORTANT: Change this to your live Render.com URL once the backend is deployed!
+// Example: "https://kpi-intelligence-reporter.onrender.com"
+// If you leave it empty (""), it will use the same host (for local testing).
+const BACKEND_URL = "";
+
 // State
 let marketingData = [
     { date: '2025-10-01', channel: 'Google', spend: 120, clicks: 60, conversions: 5, revenue: 300 },
@@ -160,7 +166,8 @@ async function generateReport() {
     const question = document.getElementById('business-question').value || "Given this data, what are the key insights and strategic recommendations?";
 
     try {
-        const response = await fetch('/api/generate', {
+        const endpoint = BACKEND_URL ? `${BACKEND_URL}/api/generate` : '/api/generate';
+        const response = await fetch(endpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
@@ -220,8 +227,9 @@ function renderReport(data) {
     const pdfBtn = document.getElementById('download-pdf-btn');
     if (data.pdf_url) {
         pdfContainer.classList.remove('hidden');
-        pdfBtn.href = data.pdf_url;
-        setupSocialSharing(memoText, data.pdf_url);
+        const fullPdfUrl = BACKEND_URL ? `${BACKEND_URL}${data.pdf_url}` : data.pdf_url;
+        pdfBtn.href = fullPdfUrl;
+        setupSocialSharing(memoText, fullPdfUrl);
     }
     
     // Render Dashboards
