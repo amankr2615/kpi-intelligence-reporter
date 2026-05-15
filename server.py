@@ -171,6 +171,14 @@ def export_full_report(state, filename="decision_playbook_report.pdf"):
         pdf.ln(5)
 
     section("Executive Memo", state.get("board_memo", "No memo."))
+    
+    if "before_image" in state and os.path.exists(state["before_image"]):
+        pdf.add_page()
+        section("Dashboard Visualizations", "Performance Projections before and after AI Optimization.")
+        pdf.image(state["before_image"], w=180)
+        pdf.ln(10)
+        pdf.image(state["after_image"], w=180)
+
     for key, label in [("analysis_summary", "Analysis"), ("options", "Options"), ("decision", "Decision"), ("playbook", "Playbook")]:
         raw = json.dumps(state.get(key, {}), indent=2)
         body = raw[:1000] + ("\n...\n[truncated]" if len(raw) > 1000 else "")
@@ -212,7 +220,7 @@ async def generate_endpoint(request: Request):
         cache_key = get_cache_key(csv_summary, question)
         if cache_key in REPORT_CACHE:
             logger.info("🔥 CACHE HIT: Returning report instantly in 0 seconds.")
-            return REPORT_CACHE[cache_key]
+            return REPORT_CACHE[cache_key]["response_data"]
 
         logger.info("Starting Elastic Chain-of-Thought Pipeline...")
         start_time = time.time()
@@ -220,24 +228,58 @@ async def generate_endpoint(request: Request):
         # 2. Async Execution + Jitter Backoff (FastAPI won't block)
         state = await run_elastic_pipeline(csv_summary, question)
 
-        logger.info("Exporting PDF in background thread...")
-        # PDF generation is synchronous file IO. We run it in a thread so 100 users don't block each other.
-        pdf_url = await asyncio.to_thread(export_full_report, state, f"report_{int(time.time())}.pdf")
-
         logger.info(f"Pipeline finished successfully in {time.time() - start_time:.2f} seconds.")
 
         response_data = {
+            "cache_key": cache_key,
             "board_memo": state.get("board_memo", ""),
-            "pdf_url": pdf_url,
             "projections": state.get("projections", {})
         }
         
         # Save to memory cache for future users
-        REPORT_CACHE[cache_key] = response_data
+        REPORT_CACHE[cache_key] = {"state": state, "response_data": response_data}
         return response_data
                 
     except Exception as e:
         logger.error(f"Error during generation: {e}")
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+import base64
+
+@app.post("/api/build_pdf")
+async def build_pdf_endpoint(request: Request):
+    try:
+        body = await request.json()
+        cache_key = body.get('cache_key')
+        before_b64 = body.get('before_image')
+        after_b64 = body.get('after_image')
+
+        cached = REPORT_CACHE.get(cache_key)
+        if not cached:
+            return JSONResponse(status_code=400, content={"error": "Session expired or invalid cache key."})
+        
+        state = cached["state"]
+
+        def decode_b64(b64_str, filename):
+            if b64_str and "base64," in b64_str:
+                b64_str = b64_str.split("base64,")[1]
+                with open(filename, "wb") as f:
+                    f.write(base64.b64decode(b64_str))
+
+        if before_b64 and after_b64:
+            before_path = f"reports/before_{cache_key}.png"
+            after_path = f"reports/after_{cache_key}.png"
+            decode_b64(before_b64, before_path)
+            decode_b64(after_b64, after_path)
+            state["before_image"] = before_path
+            state["after_image"] = after_path
+
+        logger.info("Building PDF with charts...")
+        pdf_url = await asyncio.to_thread(export_full_report, state, f"report_{cache_key}.pdf")
+        
+        return {"pdf_url": pdf_url}
+    except Exception as e:
+        logger.error(f"Error during PDF build: {e}")
         return JSONResponse(status_code=500, content={"error": str(e)})
 
 if __name__ == '__main__':

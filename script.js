@@ -183,6 +183,31 @@ async function generateReport() {
             throw new Error(data.error || `Server Error: ${response.status}`);
         }
 
+        // 1. Render Dashboards instantly (animations disabled)
+        document.getElementById('dashboards-container').classList.remove('hidden');
+        renderDashboards(data.projections);
+
+        // 2. Capture charts as Base64 images
+        const beforeB64 = beforeChartInstance.toBase64Image();
+        const afterB64 = afterChartInstance.toBase64Image();
+
+        // 3. Send images to backend to build PDF
+        const pdfEndpoint = BACKEND_URL ? `${BACKEND_URL}/api/build_pdf` : '/api/build_pdf';
+        const pdfRes = await fetch(pdfEndpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                cache_key: data.cache_key,
+                before_image: beforeB64,
+                after_image: afterB64
+            })
+        });
+        const pdfData = await pdfRes.json();
+        if(pdfRes.ok && pdfData.pdf_url) {
+            data.pdf_url = pdfData.pdf_url;
+        }
+
+        // 4. Show the text memo and the final PDF download button
         renderReport(data);
 
     } catch (error) {
@@ -231,10 +256,6 @@ function renderReport(data) {
         pdfBtn.href = fullPdfUrl;
         setupSocialSharing(memoText, fullPdfUrl);
     }
-    
-    // Render Dashboards
-    document.getElementById('dashboards-container').classList.remove('hidden');
-    renderDashboards(data.projections);
 }
 
 let beforeChartInstance = null;
@@ -256,8 +277,24 @@ function renderDashboards(projections) {
     const maxVal = Math.max(...allValues);
     const yAxisMax = Math.ceil(maxVal * 1.1);
 
+    const customCanvasBackgroundColor = {
+        id: 'customCanvasBackgroundColor',
+        beforeDraw: (chart, args, options) => {
+            const {ctx} = chart;
+            ctx.save();
+            ctx.globalCompositeOperation = 'destination-over';
+            ctx.fillStyle = options.color || '#ffffff';
+            ctx.fillRect(0, 0, chart.width, chart.height);
+            ctx.restore();
+        }
+    };
+
     const chartOptions = {
         responsive: true,
+        animation: false,
+        plugins: {
+            customCanvasBackgroundColor: { color: 'white' }
+        },
         scales: {
             y: {
                 beginAtZero: true,
@@ -278,7 +315,8 @@ function renderDashboards(projections) {
                 backgroundColor: ['#ef4444', '#3b82f6', '#10b981']
             }]
         },
-        options: chartOptions
+        options: chartOptions,
+        plugins: [customCanvasBackgroundColor]
     });
 
     const afterCtx = document.getElementById('afterChart').getContext('2d');
@@ -294,7 +332,8 @@ function renderDashboards(projections) {
                 backgroundColor: ['#f59e0b', '#2563eb', '#059669']
             }]
         },
-        options: chartOptions
+        options: chartOptions,
+        plugins: [customCanvasBackgroundColor]
     });
 }
 
