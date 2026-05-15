@@ -2,15 +2,13 @@ import os
 import json
 import logging
 import time
-import asyncio
-import hashlib
-import random
 
 from dotenv import load_dotenv
 from fpdf import FPDF
 
 from google import genai
 from google.genai import types as genai_types
+from google.genai.errors import ServerError
 
 from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse
@@ -26,13 +24,13 @@ if not API_KEY:
 PORT = int(os.environ.get("PORT", 8000))
 MODEL_NAME = "gemini-2.5-flash"
 
-# Use the async client for non-blocking concurrent requests
 client = genai.Client(api_key=API_KEY)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("decision_playbook")
 
 app = FastAPI(title="KPI Intelligence Reporter")
 
+# Allow CORS for deployment flexibility
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -41,21 +39,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Ensure reports directory exists
 os.makedirs("reports", exist_ok=True)
 app.mount("/reports", StaticFiles(directory="reports"), name="reports")
 
 # -------------------------------------------------------------------
-# Aggressive Hashed Caching (0-Second Trick)
-# -------------------------------------------------------------------
-REPORT_CACHE = {}
-
-def get_cache_key(csv_summary: dict, question: str) -> str:
-    raw_str = json.dumps(csv_summary, sort_keys=True) + question
-    return hashlib.sha256(raw_str.encode('utf-8')).hexdigest()
-
-# -------------------------------------------------------------------
 # Utilities
 # -------------------------------------------------------------------
+
 def extract_text(resp) -> str:
     t = getattr(resp, "text", None)
     if t:
@@ -88,76 +79,133 @@ def safe_parse_json(text: str) -> dict:
         pass
     return {"raw_text": text}
 
-# Elastic Jitter Backoff
-async def safe_generate_async(prompt, model=MODEL_NAME, max_retries=6):
+def safe_generate(prompt, model=MODEL_NAME, max_retries=3):
     for attempt in range(max_retries):
         try:
-            resp = await client.aio.models.generate_content(
+            return client.models.generate_content(
                 model=model,
                 contents=prompt,
                 config=genai_types.GenerateContentConfig(
                     response_mime_type="application/json"
                 )
             )
-            return resp
-        except Exception as e:
-            err_str = str(e).lower()
-            if "429" in err_str or "503" in err_str or "too many requests" in err_str or "overloaded" in err_str:
-                # Random jitter between 2 to 6 seconds prevents "thundering herd" problem
-                jitter = random.uniform(2.0, 6.0)
-                logger.warning(f"Google Rate Limited (Attempt {attempt+1}/{max_retries}). Waiting {jitter:.2f}s...")
-                await asyncio.sleep(jitter)
+        except ServerError as e:
+            if "503" in str(e):
+                logger.warning("503 Model overloaded. Retrying...")
+                time.sleep(2)
             else:
-                raise e
-    raise RuntimeError("Failed after maximum retries due to Google's strict Free-Tier rate limits.")
+                raise
+    raise RuntimeError("Failed after retries")
 
 # -------------------------------------------------------------------
-# Core Single-Pass Agent (Chain of Thought)
+# Core Agents
 # -------------------------------------------------------------------
-async def run_elastic_pipeline(csv_summary: dict, question: str):
-    logger.info("-> Starting Single-Pass Chain-of-Thought Agent")
-    
+
+def analysis_agent(state: dict):
+    logger.info("-> Analysis Agent")
     prompt = f"""
-You are a committee of expert AI agents (Data Analyst, Strategist, Decision Maker, Playbook Creator, Devil's Advocate, Financial Projector, and Board Member).
-You must deeply analyze the data and answer the question by simulating all 7 agents sequentially.
-Return EXACTLY one JSON object with this exact structure:
-{{
-  "analysis_summary": {{ "key_metrics": [{{"name": "str", "reason": "str"}}], "insights": ["str"], "risks_or_gaps": ["str"] }},
-  "options": {{ "options": [ {{ "name": "str", "description": "str", "pros": ["str"], "cons": ["str"], "data_support": "str" }} ] }},
-  "decision": {{ "recommended_option_name": "str", "rationale": "str", "notes_for_team": "str" }},
-  "playbook": {{ "days": [ {{ "day": 1, "focus": "str", "tasks": ["str"] }} ], "monitoring_plan": "str", "early_warning_signals": ["str"] }},
-  "devils_advocate": {{ "main_criticisms": ["str"], "potential_failure_modes": ["str"] }},
-  "projections": {{ "projected_marketing_revenue": <number>, "projected_product_revenue": <number>, "optimized_marketing_spend": <number> }},
-  "board_memo": "Write a 400-700 word executive memo in plain text summarizing all the findings, decisions, and execution plans."
-}}
-
-IMPORTANT: Do not skip any nested JSON keys. Provide a deep, thoughtful response for 'board_memo'.
-
-Data: {json.dumps(csv_summary)}
-Question: {question}
+You are a data analyst. Review the data and question.
+Return JSON:
+{{ "key_metrics": [{{"name": "str", "reason": "str"}}], "insights": ["str"], "risks_or_gaps": ["str"] }}
+Data: {json.dumps(state['csv_summary'])}
+Question: {state['question']}
 """
-    resp = await safe_generate_async(prompt)
-    parsed = safe_parse_json(extract_text(resp))
-    
-    # Safely construct the final state dictionary exactly as the PDF generator expects it
-    state = {
-        "csv_summary": csv_summary,
-        "question": question,
-        "analysis_summary": parsed.get("analysis_summary", {}),
-        "options": parsed.get("options", {}),
-        "decision": parsed.get("decision", {}),
-        "playbook": parsed.get("playbook", {}),
-        "devils_advocate": parsed.get("devils_advocate", {}),
-        "projections": parsed.get("projections", {}),
-        "board_memo": parsed.get("board_memo", "No memo generated.")
-    }
+    state["analysis_summary"] = safe_parse_json(extract_text(safe_generate(prompt)))
+
+def options_agent(state: dict):
+    logger.info("-> Options Agent")
+    prompt = f"""
+Generate 2-3 strategic options as JSON:
+{{ "options": [ {{ "name": "str", "description": "str", "pros": ["str"], "cons": ["str"], "data_support": "str" }} ] }}
+Analysis: {json.dumps(state['analysis_summary'])}
+Question: {state['question']}
+"""
+    state["options"] = safe_parse_json(extract_text(safe_generate(prompt)))
+
+def decision_agent(state: dict):
+    logger.info("-> Decision Agent")
+    prompt = f"""
+Choose ONE option and justify it. Return JSON:
+{{ "recommended_option_name": "str", "rationale": "str", "notes_for_team": "str" }}
+Analysis: {json.dumps(state['analysis_summary'])}
+Options: {json.dumps(state['options'])}
+"""
+    state["decision"] = safe_parse_json(extract_text(safe_generate(prompt)))
+
+def playbook_agent(state: dict):
+    logger.info("-> Playbook Agent")
+    prompt = f"""
+Create a 7-day action playbook as JSON. MUST HAVE EXACTLY 7 days:
+{{ "days": [ {{ "day": 1, "focus": "str", "tasks": ["str"] }} ], "monitoring_plan": "str", "early_warning_signals": ["str"] }}
+Decision: {json.dumps(state['decision'])}
+Analysis: {json.dumps(state['analysis_summary'])}
+"""
+    state["playbook"] = safe_parse_json(extract_text(safe_generate(prompt)))
+
+def devils_advocate_agent(state: dict):
+    logger.info("-> Devil's Advocate Agent")
+    prompt = f"""
+Critique the decision. Return JSON:
+{{ "main_criticisms": ["str"], "potential_failure_modes": ["str"] }}
+Decision: {json.dumps(state['decision'])}
+Playbook: {json.dumps(state['playbook'])}
+"""
+    state["devils_advocate"] = safe_parse_json(extract_text(safe_generate(prompt)))
+
+def projection_agent(state: dict):
+    logger.info("-> Projection Agent (Dashboards)")
+    prompt = f"""
+You are a financial projection engine. Based on the data and the chosen strategy, mathematically project the future metrics.
+Return EXACTLY this JSON structure with integer values:
+{{
+  "projected_marketing_revenue": <number>,
+  "projected_product_revenue": <number>,
+  "optimized_marketing_spend": <number>
+}}
+IMPORTANT: Do not just invent random numbers. Look at the CURRENT totals in the data, and project realistic growth (e.g., +10% to +25%) based on your strategic decision.
+Data: {json.dumps(state['csv_summary'])}
+Decision: {json.dumps(state['decision'])}
+"""
+    state["projections"] = safe_parse_json(extract_text(safe_generate(prompt)))
+
+
+def board_memo_agent(state: dict):
+    logger.info("-> Board Memo Agent")
+    prompt = f"""
+Write a 400-700 word executive memo. Return PLAIN TEXT.
+Sections:
+1. Context & Question
+2. Data-Backed Insights
+3. Options Considered
+4. Recommended Decision & Why
+5. Execution Plan (7-day summary)
+6. Risks & Dissent (From Devil's Advocate)
+Question: {state['question']}
+Data: {json.dumps(state)}
+"""
+    resp = client.models.generate_content(model=MODEL_NAME, contents=prompt)
+    state["board_memo"] = extract_text(resp)
+
+# -------------------------------------------------------------------
+# Core Loop
+# -------------------------------------------------------------------
+def run_full_pipeline(csv_summary: dict, question: str):
+    state = {"csv_summary": csv_summary, "question": question}
+    analysis_agent(state)
+    options_agent(state)
+    decision_agent(state)
+    playbook_agent(state)
+    devils_advocate_agent(state)
+    projection_agent(state)
+    board_memo_agent(state)
     return state
 
 # -------------------------------------------------------------------
-# PDF Generation (Moved to background thread)
+# PDF Generation
 # -------------------------------------------------------------------
 def export_full_report(state, filename="decision_playbook_report.pdf"):
     pdf_path = os.path.join("reports", filename)
+
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=15)
     pdf.add_page()
@@ -207,34 +255,22 @@ async def generate_endpoint(request: Request):
             return JSONResponse(status_code=500, content={"error": "Server misconfiguration: GEMINI_API_KEY is not set in backend."})
         
         csv_summary = {"marketing_data": m_data, "product_data": p_data}
-        
-        # 1. Hashed Caching (O-second retrieval for duplicates)
-        cache_key = get_cache_key(csv_summary, question)
-        if cache_key in REPORT_CACHE:
-            logger.info("🔥 CACHE HIT: Returning report instantly in 0 seconds.")
-            return REPORT_CACHE[cache_key]
 
-        logger.info("Starting Elastic Chain-of-Thought Pipeline...")
+        logger.info("Starting Full Multi-Agent Decision Pipeline (Quality Mode)...")
         start_time = time.time()
         
-        # 2. Async Execution + Jitter Backoff (FastAPI won't block)
-        state = await run_elastic_pipeline(csv_summary, question)
+        state = run_full_pipeline(csv_summary, question)
 
-        logger.info("Exporting PDF in background thread...")
-        # PDF generation is synchronous file IO. We run it in a thread so 100 users don't block each other.
-        pdf_url = await asyncio.to_thread(export_full_report, state, f"report_{int(time.time())}.pdf")
+        logger.info("Exporting PDF...")
+        pdf_url = export_full_report(state, filename=f"report_{int(time.time())}.pdf")
 
-        logger.info(f"Pipeline finished successfully in {time.time() - start_time:.2f} seconds.")
+        logger.info(f"Pipeline finished in {time.time() - start_time:.2f} seconds.")
 
-        response_data = {
+        return {
             "board_memo": state.get("board_memo", ""),
             "pdf_url": pdf_url,
             "projections": state.get("projections", {})
         }
-        
-        # Save to memory cache for future users
-        REPORT_CACHE[cache_key] = response_data
-        return response_data
                 
     except Exception as e:
         logger.error(f"Error during generation: {e}")
