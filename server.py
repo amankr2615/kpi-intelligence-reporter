@@ -133,6 +133,10 @@ Return EXACTLY one JSON object with this exact structure:
 
 IMPORTANT: Do not skip any nested JSON keys. Provide a deep, thoughtful response for 'board_memo'.
 
+CRITICAL PROJECTION GUIDELINES:
+- The "projections" numbers MUST be realistic and mathematically grounded in the provided Data.
+- DO NOT hallucinate massive revenue spikes. Assume a realistic AI optimization impact of 5% to 25% maximum improvement over the current metrics.
+
 Data: {json.dumps(csv_summary)}
 Question: {question}
 """
