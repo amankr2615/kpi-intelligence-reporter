@@ -187,6 +187,9 @@ async function generateReport() {
         document.getElementById('dashboards-container').classList.remove('hidden');
         renderDashboards(data.projections);
 
+        // Give the browser 500ms to physically paint the charts before we screenshot them
+        await new Promise(resolve => setTimeout(resolve, 500));
+
         // 2. Capture charts as Base64 images
         const beforeB64 = beforeChartInstance.toBase64Image();
         const afterB64 = afterChartInstance.toBase64Image();
