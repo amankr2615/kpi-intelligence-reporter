@@ -5,6 +5,7 @@ import time
 import asyncio
 import hashlib
 import random
+import httpx
 
 from dotenv import load_dotenv
 from fpdf import FPDF
@@ -43,6 +44,32 @@ app.add_middleware(
 
 os.makedirs("reports", exist_ok=True)
 app.mount("/reports", StaticFiles(directory="reports"), name="reports")
+
+# -------------------------------------------------------------------
+# Keep-Alive: Ping self every 13 min to prevent Render cold starts
+# -------------------------------------------------------------------
+RENDER_URL = os.getenv("RENDER_EXTERNAL_URL", "")
+
+async def keep_alive_ping():
+    """Background task that pings the server's own health endpoint to prevent sleep."""
+    await asyncio.sleep(60)  # Initial wait for server to fully boot
+    async with httpx.AsyncClient() as http:
+        while True:
+            try:
+                if RENDER_URL:
+                    await http.get(f"{RENDER_URL}/health", timeout=10)
+                    logger.info("[Keep-Alive] Pinged self — server stays warm.")
+            except Exception as e:
+                logger.warning(f"[Keep-Alive] Ping failed: {e}")
+            await asyncio.sleep(13 * 60)  # Every 13 minutes
+
+@app.on_event("startup")
+async def startup_event():
+    asyncio.create_task(keep_alive_ping())
+
+@app.get("/health")
+async def health_check():
+    return {"status": "ok"}
 
 # -------------------------------------------------------------------
 # Aggressive Hashed Caching (0-Second Trick)

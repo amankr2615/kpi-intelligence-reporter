@@ -6,3 +6,4 @@ google-genai
 pandas
 fpdf2
 python-dotenv
+httpx
