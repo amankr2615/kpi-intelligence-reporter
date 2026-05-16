@@ -9,3 +9,6 @@ coverage/
 
 # Private master backup — local only, never pushed to GitHub
 server_master.py
+
+# Reports are hosted on Supabase Storage — no need to push to GitHub
+reports/
