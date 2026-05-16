@@ -6,3 +6,6 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Private master backup — local only, never pushed to GitHub
+server_master.py
