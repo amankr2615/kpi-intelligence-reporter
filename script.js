@@ -2,7 +2,7 @@
 // IMPORTANT: Change this to your live Render.com URL once the backend is deployed!
 // Example: "https://kpi-intelligence-reporter.onrender.com"
 // If you leave it empty (""), it will use the same host (for local testing).
-const BACKEND_URL = "";
+const BACKEND_URL = "https://kpi-backend-dl16.onrender.com";
 
 // State
 let marketingData = [

@@ -70,34 +70,72 @@ def extract_text(resp) -> str:
                     parts.append(txt)
     return "\n".join(parts).strip()
 
-def safe_parse_json(text: str) -> dict:
-    text = text.strip()
-    if text.startswith("```"):
-        parts = text.split("```")
-        if len(parts) >= 3:
-            if parts[1].strip().lower().startswith("json"):
-                text = parts[2].strip()
-            else:
-                text = parts[1].strip()
-    try:
-        start = text.find("{")
-        end = text.rfind("}")
-        if start != -1 and end != -1 and end > start:
-            return json.loads(text[start : end + 1])
-    except Exception:
-        pass
-    return {"raw_text": text}
+from pydantic import BaseModel
+
+class Metric(BaseModel):
+    name: str
+    reason: str
+
+class AnalysisSummary(BaseModel):
+    key_metrics: list[Metric]
+    insights: list[str]
+    risks_or_gaps: list[str]
+
+class Option(BaseModel):
+    name: str
+    description: str
+    pros: list[str]
+    cons: list[str]
+    data_support: str
+
+class Options(BaseModel):
+    options: list[Option]
+
+class Decision(BaseModel):
+    recommended_option_name: str
+    rationale: str
+    notes_for_team: str
+
+class DayTask(BaseModel):
+    day: int
+    focus: str
+    tasks: list[str]
+
+class Playbook(BaseModel):
+    days: list[DayTask]
+    monitoring_plan: str
+    early_warning_signals: list[str]
+
+class DevilsAdvocate(BaseModel):
+    main_criticisms: list[str]
+    potential_failure_modes: list[str]
+
+class Projections(BaseModel):
+    projected_marketing_revenue: float
+    projected_product_revenue: float
+    optimized_marketing_spend: float
+
+class OutputSchema(BaseModel):
+    analysis_summary: AnalysisSummary
+    options: Options
+    decision: Decision
+    playbook: Playbook
+    devils_advocate: DevilsAdvocate
+    projections: Projections
+    board_memo: str
 
 # Elastic Jitter Backoff
-async def safe_generate_async(prompt, model=MODEL_NAME, max_retries=6):
+async def safe_generate_async(prompt, model=MODEL_NAME, max_retries=6, response_schema=None):
     for attempt in range(max_retries):
         try:
+            config_kwargs = {"response_mime_type": "application/json"}
+            if response_schema:
+                config_kwargs["response_schema"] = response_schema
+                
             resp = await client.aio.models.generate_content(
                 model=model,
                 contents=prompt,
-                config=genai_types.GenerateContentConfig(
-                    response_mime_type="application/json"
-                )
+                config=genai_types.GenerateContentConfig(**config_kwargs)
             )
             return resp
         except Exception as e:
@@ -140,8 +178,11 @@ CRITICAL PROJECTION GUIDELINES:
 Data: {json.dumps(csv_summary)}
 Question: {question}
 """
-    resp = await safe_generate_async(prompt)
-    parsed = safe_parse_json(extract_text(resp))
+    resp = await safe_generate_async(prompt, response_schema=OutputSchema)
+    try:
+        parsed = json.loads(extract_text(resp))
+    except Exception:
+        parsed = {}
     
     # Safely construct the final state dictionary exactly as the PDF generator expects it
     state = {
