@@ -7,3 +7,4 @@ pandas
 fpdf2
 python-dotenv
 httpx
+supabase

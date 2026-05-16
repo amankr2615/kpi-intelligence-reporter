@@ -6,6 +6,7 @@ import asyncio
 import hashlib
 import random
 import httpx
+import base64
 
 from dotenv import load_dotenv
 from fpdf import FPDF
@@ -23,6 +24,16 @@ load_dotenv()
 API_KEY = os.getenv('GEMINI_API_KEY')
 if not API_KEY:
     API_KEY = "YOUR_API_KEY_HERE"
+
+SUPABASE_URL = os.getenv('SUPABASE_URL', '')
+SUPABASE_KEY = os.getenv('SUPABASE_KEY', '')
+
+# Initialize Supabase client if credentials are available
+try:
+    from supabase import create_client
+    supabase_client = create_client(SUPABASE_URL, SUPABASE_KEY) if SUPABASE_URL and SUPABASE_KEY else None
+except Exception:
+    supabase_client = None
 
 PORT = int(os.environ.get("PORT", 8000))
 MODEL_NAME = "gemini-2.5-flash"
@@ -51,8 +62,7 @@ app.mount("/reports", StaticFiles(directory="reports"), name="reports")
 RENDER_URL = os.getenv("RENDER_EXTERNAL_URL", "")
 
 async def keep_alive_ping():
-    """Background task that pings the server's own health endpoint to prevent sleep."""
-    await asyncio.sleep(60)  # Initial wait for server to fully boot
+    await asyncio.sleep(60)
     async with httpx.AsyncClient() as http:
         while True:
             try:
@@ -61,7 +71,7 @@ async def keep_alive_ping():
                     logger.info("[Keep-Alive] Pinged self — server stays warm.")
             except Exception as e:
                 logger.warning(f"[Keep-Alive] Ping failed: {e}")
-            await asyncio.sleep(13 * 60)  # Every 13 minutes
+            await asyncio.sleep(13 * 60)
 
 @app.on_event("startup")
 async def startup_event():
@@ -72,13 +82,57 @@ async def health_check():
     return {"status": "ok"}
 
 # -------------------------------------------------------------------
-# Aggressive Hashed Caching (0-Second Trick)
+# Caching: In-memory (fast) + Supabase DB (persistent across restarts)
 # -------------------------------------------------------------------
-REPORT_CACHE = {}
+REPORT_CACHE = {}  # In-memory L1 cache
 
 def get_cache_key(csv_summary: dict, question: str) -> str:
     raw_str = json.dumps(csv_summary, sort_keys=True) + question
     return hashlib.sha256(raw_str.encode('utf-8')).hexdigest()
+
+def db_get_cache(cache_key: str):
+    """Look up a cached report from Supabase DB."""
+    if not supabase_client:
+        return None
+    try:
+        res = supabase_client.table('reports').select('*').eq('cache_key', cache_key).single().execute()
+        return res.data
+    except Exception:
+        return None
+
+def db_set_cache(cache_key: str, question: str, result_json: dict, pdf_url: str = None):
+    """Store a report result in Supabase DB."""
+    if not supabase_client:
+        return
+    try:
+        supabase_client.table('reports').upsert({
+            'cache_key': cache_key,
+            'question': question,
+            'result_json': result_json,
+            'pdf_url': pdf_url or ''
+        }).execute()
+    except Exception as e:
+        logger.warning(f"[DB] Cache write failed: {e}")
+
+def upload_to_storage(local_path: str, storage_path: str) -> str:
+    """Upload a file to Supabase Storage and return its public URL."""
+    if not supabase_client:
+        return f"/{local_path}"
+    try:
+        with open(local_path, 'rb') as f:
+            content = f.read()
+        mime = 'application/pdf' if local_path.endswith('.pdf') else 'image/png'
+        supabase_client.storage.from_('reports').upload(
+            path=storage_path,
+            file=content,
+            file_options={"content-type": mime, "upsert": "true"}
+        )
+        public_url = f"{SUPABASE_URL}/storage/v1/object/public/reports/{storage_path}"
+        logger.info(f"[Storage] Uploaded {storage_path} → {public_url}")
+        return public_url
+    except Exception as e:
+        logger.warning(f"[Storage] Upload failed: {e}")
+        return f"/{local_path}"
 
 # -------------------------------------------------------------------
 # Utilities
@@ -288,16 +342,29 @@ async def generate_endpoint(request: Request):
         
         csv_summary = {"marketing_data": m_data, "product_data": p_data}
         
-        # 1. Hashed Caching (O-second retrieval for duplicates)
+        # 1. L1 In-Memory Cache
         cache_key = get_cache_key(csv_summary, question)
         if cache_key in REPORT_CACHE:
-            logger.info("🔥 CACHE HIT: Returning report instantly in 0 seconds.")
+            logger.info("🔥 L1 CACHE HIT: Returning report instantly (in-memory).")
             return REPORT_CACHE[cache_key]["response_data"]
+
+        # 2. L2 Supabase DB Cache (survives server restarts)
+        db_row = db_get_cache(cache_key)
+        if db_row and db_row.get('result_json'):
+            logger.info("⚡ L2 CACHE HIT: Returning report from Supabase DB.")
+            response_data = {
+                "cache_key": cache_key,
+                "board_memo": db_row['result_json'].get('board_memo', ''),
+                "projections": db_row['result_json'].get('projections', {}),
+                "pdf_url": db_row.get('pdf_url', '')
+            }
+            REPORT_CACHE[cache_key] = {"state": db_row['result_json'], "response_data": response_data}
+            return response_data
 
         logger.info("Starting Elastic Chain-of-Thought Pipeline...")
         start_time = time.time()
         
-        # 2. Async Execution + Jitter Backoff (FastAPI won't block)
+        # 3. Async Execution + Jitter Backoff
         state = await run_elastic_pipeline(csv_summary, question)
 
         logger.info(f"Pipeline finished successfully in {time.time() - start_time:.2f} seconds.")
@@ -308,8 +375,9 @@ async def generate_endpoint(request: Request):
             "projections": state.get("projections", {})
         }
         
-        # Save to memory cache for future users
+        # Save to both L1 (memory) and L2 (Supabase DB)
         REPORT_CACHE[cache_key] = {"state": state, "response_data": response_data}
+        db_set_cache(cache_key, question, state)
         return response_data
                 
     except Exception as e:
@@ -347,9 +415,21 @@ async def build_pdf_endpoint(request: Request):
             state["after_image"] = after_path
 
         logger.info("Building PDF with charts...")
-        pdf_url = await asyncio.to_thread(export_full_report, state, f"report_{cache_key}.pdf")
-        
-        return {"pdf_url": pdf_url}
+        pdf_filename = f"report_{cache_key}.pdf"
+        pdf_local_url = await asyncio.to_thread(export_full_report, state, pdf_filename)
+
+        # Upload PDF and charts to Supabase Storage for permanent hosting
+        pdf_local_path = f"reports/{pdf_filename}"
+        pdf_public_url = await asyncio.to_thread(upload_to_storage, pdf_local_path, pdf_filename)
+        if before_b64 and after_b64:
+            await asyncio.to_thread(upload_to_storage, before_path, f"before_{cache_key}.png")
+            await asyncio.to_thread(upload_to_storage, after_path, f"after_{cache_key}.png")
+
+        # Update DB cache with the permanent PDF URL
+        db_set_cache(cache_key, cached.get('state', {}).get('question', ''), state, pdf_public_url)
+
+        # Return Supabase public URL if available, otherwise local fallback
+        return {"pdf_url": pdf_public_url}
     except Exception as e:
         logger.error(f"Error during PDF build: {e}")
         return JSONResponse(status_code=500, content={"error": str(e)})
