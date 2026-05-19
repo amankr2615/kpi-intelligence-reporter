@@ -3,7 +3,6 @@ uvicorn
 pydantic
 python-multipart
 google-genai
-pandas
 fpdf2
 python-dotenv
 httpx

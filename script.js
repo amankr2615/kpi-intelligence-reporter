@@ -228,23 +228,53 @@ function renderReport(data) {
     container.classList.remove('hidden');
 
     let memoText = data.board_memo || "No memo generated.";
-    
-    // Simple parsing for bold markdown
+
+    // Bold markdown
     memoText = memoText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-    
+
     let html = `<h1>Executive Board Memo</h1>`;
-    
-    // Split by newlines and create paragraphs/headers
-    const paragraphs = memoText.split('\n');
-    paragraphs.forEach(p => {
-        if(p.trim() === '') return;
-        if(p.match(/^[0-9]\.\s/)) {
-            // It's a numbered section header like "1. Context"
+
+    // Extract formal header fields (To / From / Date / Subject)
+    // They may be on separate lines OR crammed into one line
+    const headerFields = ['To', 'From', 'Date', 'Subject'];
+    const headerLineRegex = new RegExp(
+        `(${headerFields.join('|')})[:\s]+([^\n]+?)(?=(?:${headerFields.join('|')})[:\s]|Dear|$)`,
+        'gi'
+    );
+
+    const headerMatches = [...memoText.matchAll(headerLineRegex)];
+
+    if (headerMatches.length >= 2) {
+        // Build a clean formal header block
+        html += `<div class="memo-header-block">`;
+        headerMatches.forEach(m => {
+            html += `<div class="memo-header-row">`
+                  + `<span class="memo-header-key">${m[1]}:</span>`
+                  + `<span class="memo-header-val">${m[2].trim()}</span>`
+                  + `</div>`;
+        });
+        html += `</div>`;
+
+        // Remove the header portion from the body text
+        const lastMatch = headerMatches[headerMatches.length - 1];
+        const afterHeaders = memoText.slice(lastMatch.index + lastMatch[0].length).trim();
+        memoText = afterHeaders;
+    }
+
+    // Render the rest as paragraphs / headers / bullets
+    const lines = memoText.split('\n');
+    lines.forEach(line => {
+        const p = line.trim();
+        if (p === '') {
+            html += `<div style="height:10px"></div>`;
+        } else if (p.match(/^[0-9]+\.\s/)) {
             html += `<h3>${p}</h3>`;
-        } else if(p.startsWith('*') || p.startsWith('-')) {
-            html += `<li style="margin-left:20px; margin-bottom: 8px;">${p.substring(1).trim()}</li>`;
+        } else if (p.startsWith('Dear ') || p.startsWith('Sincerely') || p.startsWith('Regards')) {
+            html += `<p class="memo-salutation">${p}</p>`;
+        } else if (p.startsWith('*') || p.startsWith('-')) {
+            html += `<li style="margin-left:20px;margin-bottom:8px">${p.substring(1).trim()}</li>`;
         } else {
-            html += `<p style="margin-bottom: 12px;">${p}</p>`;
+            html += `<p style="margin-bottom:13px">${p}</p>`;
         }
     });
 
@@ -255,7 +285,8 @@ function renderReport(data) {
     const pdfBtn = document.getElementById('download-pdf-btn');
     if (data.pdf_url) {
         pdfContainer.classList.remove('hidden');
-        const fullPdfUrl = BACKEND_URL ? `${BACKEND_URL}${data.pdf_url}` : data.pdf_url;
+        // pdf_url from Supabase is already a full https:// URL — don't prepend BACKEND_URL
+        const fullPdfUrl = data.pdf_url.startsWith('http') ? data.pdf_url : `${BACKEND_URL}${data.pdf_url}`;
         pdfBtn.href = fullPdfUrl;
         setupSocialSharing(memoText, fullPdfUrl);
     }

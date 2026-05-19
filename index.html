@@ -3,112 +3,396 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KPI Intelligence Reporter</title>
+    <title>KPI Intelligence Reporter — AI Executive Decision Engine</title>
+    <meta name="description" content="Upload your business data and receive an AI-generated executive decision memo. Boardroom-ready insights in seconds.">
     <link rel="stylesheet" href="styles.css">
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <!-- PapaParse for native CSV parsing -->
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
-    <!-- Marked for Markdown to HTML conversion -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <!-- Chart.js for Dashboards -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
-    <div class="background-blobs">
-        <div class="blob blob-1"></div>
-        <div class="blob blob-2"></div>
+
+    <!-- Background -->
+    <div class="bg-canvas">
+        <div class="bg-mesh"></div>
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
     </div>
 
+    <!-- Nav -->
+    <nav class="site-nav">
+        <div class="nav-logo">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"></polyline>
+                <polyline points="16 7 22 7 22 13"></polyline>
+            </svg>
+            KPI Intelligence
+        </div>
+        <div class="nav-tag">Beta</div>
+    </nav>
+
     <div class="app-container">
-        <header>
-            <div class="logo">
-                <span class="logo-icon">📈</span>
-                <h1>KPI Intelligence Reporter</h1>
+
+        <!-- Hero -->
+        <header class="site-header">
+            <h1>
+                Your data,<br>
+                <em>boardroom-ready.</em>
+            </h1>
+            <p class="header-sub">
+                Upload your marketing and sales CSVs, ask a business question,<br class="br-desktop">
+                and receive a structured executive decision memo — instantly.
+            </p>
+
+            <!-- Abstract SVG line art (no fake data) -->
+            <div class="hero-art" aria-hidden="true">
+                <svg viewBox="0 0 700 180" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <!-- Horizontal grid lines -->
+                    <line x1="0" y1="30" x2="700" y2="30" stroke="rgba(6,182,212,0.12)" stroke-width="1"/>
+                    <line x1="0" y1="90" x2="700" y2="90" stroke="rgba(6,182,212,0.12)" stroke-width="1"/>
+                    <line x1="0" y1="150" x2="700" y2="150" stroke="rgba(6,182,212,0.12)" stroke-width="1"/>
+                    <!-- Animated data line -->
+                    <polyline class="chart-line" points="0,150 80,130 140,110 200,95 260,100 320,70 380,55 440,40 500,30 560,22 620,18 700,10" stroke="url(#lineGrad)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                    <!-- Gradient fill under the line -->
+                    <polygon class="chart-fill" points="0,150 80,130 140,110 200,95 260,100 320,70 380,55 440,40 500,30 560,22 620,18 700,10 700,180 0,180" fill="url(#fillGrad)"/>
+                    <!-- Highlight dots -->
+                    <circle cx="320" cy="70"  r="4" fill="#06b6d4" opacity="0.9"/>
+                    <circle cx="500" cy="30"  r="4" fill="#8b5cf6" opacity="0.9"/>
+                    <circle cx="700" cy="10"  r="5" fill="#10b981" opacity="1">
+                        <animate attributeName="r" values="4;7;4" dur="2s" repeatCount="indefinite"/>
+                        <animate attributeName="opacity" values="1;0.5;1" dur="2s" repeatCount="indefinite"/>
+                    </circle>
+                    <!-- Defs -->
+                    <defs>
+                        <linearGradient id="lineGrad" x1="0" y1="0" x2="700" y2="0" gradientUnits="userSpaceOnUse">
+                            <stop offset="0%" stop-color="#06b6d4"/>
+                            <stop offset="60%" stop-color="#8b5cf6"/>
+                            <stop offset="100%" stop-color="#10b981"/>
+                        </linearGradient>
+                        <linearGradient id="fillGrad" x1="0" y1="0" x2="0" y2="180" gradientUnits="userSpaceOnUse">
+                            <stop offset="0%" stop-color="rgba(6,182,212,0.12)"/>
+                            <stop offset="100%" stop-color="rgba(6,182,212,0)"/>
+                        </linearGradient>
+                    </defs>
+                </svg>
+                <div class="art-labels">
+                    <span>Data In</span>
+                    <span>AI Analysis</span>
+                    <span>Decision</span>
+                </div>
             </div>
-            <p>Upload data, manage metrics, and generate an AI-powered Executive Decision Memo.</p>
+
+            <div class="scroll-hint">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <polyline points="19 12 12 19 5 12"></polyline>
+                </svg>
+                Upload your data below
+            </div>
         </header>
 
-        <div class="glass-panel">
-            <div class="tabs">
-                <button class="tab-btn active" data-tab="data-management">🗄️ Data Management</button>
-                <button class="tab-btn" data-tab="report-view">📝 Executive Memo</button>
-            </div>
+        <!-- Main Panel -->
+        <main class="main-panel">
 
-            <!-- Tab Content: Data Management -->
+            <!-- Tab Nav -->
+            <nav class="tab-nav">
+                <button class="tab-btn active" data-tab="data-management" id="tab-data">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+                        <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
+                        <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
+                    </svg>
+                    Data Management
+                </button>
+                <button class="tab-btn" data-tab="report-view" id="tab-report">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                    </svg>
+                    Executive Report
+                </button>
+            </nav>
+
+            <!-- DATA MANAGEMENT TAB -->
             <div id="data-management" class="tab-content active">
-                <div class="grid-layout">
-                    <!-- Marketing Section -->
-                    <div class="card">
-                        <h3>Marketing Performance</h3>
-                        <div class="upload-area">
-                            <label for="marketing-upload" class="upload-btn">Choose CSV File</label>
-                            <input type="file" id="marketing-upload" accept=".csv" hidden>
-                            <span id="marketing-file-name" class="file-name">No file chosen</span>
+                <div class="data-grid">
+
+                    <!-- Marketing Card -->
+                    <div class="data-card">
+                        <div class="card-header">
+                            <div class="card-icon marketing-icon">
+                                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
+                                </svg>
+                            </div>
+                            <div>
+                                <h3>Marketing Performance</h3>
+                                <p class="card-sub">Spend, revenue &amp; campaign metrics</p>
+                            </div>
                         </div>
+                        <label for="marketing-upload" class="upload-zone">
+                            <div class="upload-icon">
+                                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                    <polyline points="17 8 12 3 7 8"></polyline>
+                                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                                </svg>
+                            </div>
+                            <span class="upload-text">Drop CSV or click to upload</span>
+                            <span id="marketing-file-name" class="upload-filename">No file selected</span>
+                        </label>
+                        <input type="file" id="marketing-upload" accept=".csv" hidden>
                         <div class="table-container" id="marketing-table-container"></div>
-                        <button class="action-btn outline-btn" id="add-marketing-row">+ Add Row</button>
+                        <button class="add-row-btn" id="add-marketing-row">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                                <line x1="12" y1="5" x2="12" y2="19"></line>
+                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                            </svg>
+                            Add Row
+                        </button>
                     </div>
 
-                    <!-- Product Section -->
-                    <div class="card">
-                        <h3>Product Sales</h3>
-                        <div class="upload-area">
-                            <label for="product-upload" class="upload-btn">Choose CSV File</label>
-                            <input type="file" id="product-upload" accept=".csv" hidden>
-                            <span id="product-file-name" class="file-name">No file chosen</span>
+                    <!-- Product Card -->
+                    <div class="data-card">
+                        <div class="card-header">
+                            <div class="card-icon product-icon">
+                                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                                    <line x1="8" y1="21" x2="16" y2="21"></line>
+                                    <line x1="12" y1="17" x2="12" y2="21"></line>
+                                </svg>
+                            </div>
+                            <div>
+                                <h3>Product Sales</h3>
+                                <p class="card-sub">Units, revenue &amp; product data</p>
+                            </div>
                         </div>
+                        <label for="product-upload" class="upload-zone">
+                            <div class="upload-icon">
+                                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                    <polyline points="17 8 12 3 7 8"></polyline>
+                                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                                </svg>
+                            </div>
+                            <span class="upload-text">Drop CSV or click to upload</span>
+                            <span id="product-file-name" class="upload-filename">No file selected</span>
+                        </label>
+                        <input type="file" id="product-upload" accept=".csv" hidden>
                         <div class="table-container" id="product-table-container"></div>
-                        <button class="action-btn outline-btn" id="add-product-row">+ Add Row</button>
+                        <button class="add-row-btn" id="add-product-row">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                                <line x1="12" y1="5" x2="12" y2="19"></line>
+                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                            </svg>
+                            Add Row
+                        </button>
                     </div>
                 </div>
 
-                <div class="action-bar" style="display: flex; flex-direction: column; align-items: center; gap: 15px; margin-top: 40px;">
-                    <textarea id="business-question" placeholder="Enter your business question (e.g. Which channel should I prioritize?)" style="width: 100%; max-width: 600px; padding: 12px; border-radius: 8px; border: 1px solid #cbd5e1; font-family: inherit; resize: vertical; min-height: 80px;"></textarea>
-                    <button id="generate-btn" class="action-btn primary-btn pulse-animation">
-                        ✨ Generate AI Multi-Agent Report
+                <!-- Question + Generate -->
+                <div class="generate-section">
+                    <div class="question-wrap">
+                        <label class="question-label" for="business-question">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <line x1="12" y1="8" x2="12" y2="12"></line>
+                                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                            </svg>
+                            Your business question
+                        </label>
+                        <textarea id="business-question" class="question-input" placeholder="e.g. Which marketing channel gives us the highest ROI and where should we reallocate budget?"></textarea>
+                    </div>
+                    <button id="generate-btn" class="generate-btn">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                        </svg>
+                        Generate Report
                     </button>
                 </div>
             </div>
 
-            <!-- Tab Content: Report -->
+            <!-- REPORT TAB -->
             <div id="report-view" class="tab-content">
+
+                <!-- Loading -->
                 <div id="loading-state" class="hidden">
-                    <div class="spinner"></div>
-                    <p>Analyzing data and drafting memo... Please wait.</p>
+                    <div class="ai-loader">
+                        <div class="loader-ring"></div>
+                        <div class="loader-ring ring-2"></div>
+                        <div class="loader-ring ring-3"></div>
+                        <div class="loader-core">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                            </svg>
+                        </div>
+                    </div>
+                    <p class="loader-title">Analyzing your data</p>
+                    <p class="loader-sub">Multi-agent AI is processing your KPIs and drafting your executive memo...</p>
                 </div>
+
+                <!-- Error -->
                 <div id="error-state" class="hidden"></div>
+
+                <!-- Report Content -->
                 <div id="report-content" class="memo-content">
-                    <div class="empty-state">No report generated yet. Go to Data Management and click 'Generate'.</div>
+                    <div class="empty-state">
+                        <div class="empty-icon">
+                            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                <polyline points="14 2 14 8 20 8"></polyline>
+                            </svg>
+                        </div>
+                        <p>No report generated yet</p>
+                        <span>Upload your data in the Data Management tab, type your business question, and click Generate.</span>
+                    </div>
                 </div>
-                <div id="dashboards-container" class="hidden" style="margin-top: 30px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-                    <div class="card" style="padding: 15px;">
-                        <h3 style="text-align: center;">Before AI Analysis</h3>
+
+                <!-- Dashboards -->
+                <div id="dashboards-container" class="hidden dashboards-grid">
+                    <div class="chart-card">
+                        <div class="chart-label before-label">
+                            <span class="label-dot red-dot"></span>
+                            Before AI Analysis
+                        </div>
                         <canvas id="beforeChart"></canvas>
                     </div>
-                    <div class="card" style="padding: 15px;">
-                        <h3 style="text-align: center;">After AI Analysis</h3>
+                    <div class="chart-card">
+                        <div class="chart-label after-label">
+                            <span class="label-dot green-dot"></span>
+                            After AI Analysis
+                        </div>
                         <canvas id="afterChart"></canvas>
                     </div>
                 </div>
 
-                <div id="pdf-download-container" style="text-align: center; margin-top: 30px;" class="hidden">
-                    <a id="download-pdf-btn" href="#" target="_blank" class="action-btn primary-btn" style="text-decoration: none; display: inline-block; margin-bottom: 20px;">
-                        📥 Download Full Executive PDF Report
+                <!-- Download & Share -->
+                <div id="pdf-download-container" class="hidden action-section">
+                    <a id="download-pdf-btn" href="#" target="_blank" class="download-btn">
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                        Download Executive PDF
                     </a>
-                    
-                    <div id="social-share-container" style="display: flex; justify-content: center; gap: 15px; margin-top: 10px;">
-                        <button id="share-whatsapp" class="action-btn outline-btn" style="border-color: #25D366; color: #25D366;">📱 Share on WhatsApp</button>
-                        <button id="share-email" class="action-btn outline-btn">📧 Share via Email</button>
-                        <button id="share-copy" class="action-btn outline-btn">📋 Copy Link</button>
+                    <div class="share-row">
+                        <button id="share-whatsapp" class="share-btn whatsapp-btn">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                            WhatsApp
+                        </button>
+                        <button id="share-email" class="share-btn email-btn">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+                            Email
+                        </button>
+                        <button id="share-copy" class="share-btn copy-btn">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                            Copy Link
+                        </button>
                     </div>
                 </div>
             </div>
-        </div>
+
+        </main>
+
+        <footer class="site-footer">
+            <span>KPI Intelligence Reporter</span>
+            <span class="footer-dot">·</span>
+            <span>Built for decision makers</span>
+        </footer>
     </div>
 
+    <script src="script.js?v=4"></script>
 
+    <script>
+        // ── Agent chip cycling (loading state) ──
+        let agentIdx = 0;
+        const chips = document.querySelectorAll('.agent-chip');
+        setInterval(() => {
+            chips.forEach(c => c.classList.remove('active'));
+            chips[agentIdx % chips.length].classList.add('active');
+            agentIdx++;
+        }, 800);
 
-    <script src="script.js?v=2"></script>
+        // ══════════════════════════════════════════
+        //   3D DYNAMIC SCENE SYSTEM
+        // ══════════════════════════════════════════
+
+        const orb1   = document.querySelector('.orb-1');
+        const orb2   = document.querySelector('.orb-2');
+        const panel  = document.querySelector('.main-panel');
+        const header = document.querySelector('.site-header');
+
+        // Smooth lerp values
+        let mouseX = 0, mouseY = 0;
+        let lerpX  = 0, lerpY  = 0;
+        let rafId;
+
+        document.addEventListener('mousemove', e => {
+            // Normalise -1 to +1 from center of viewport
+            mouseX = (e.clientX / window.innerWidth  - 0.5) * 2;
+            mouseY = (e.clientY / window.innerHeight - 0.5) * 2;
+        });
+
+        function animateScene() {
+            // Smooth lerp — feels fluid, not snappy
+            lerpX += (mouseX - lerpX) * 0.06;
+            lerpY += (mouseY - lerpY) * 0.06;
+
+            // ── Layer 1: Background orb parallax (largest movement) ──
+            if (orb1) orb1.style.transform = `translate(${lerpX * 30}px, ${lerpY * 20}px)`;
+            if (orb2) orb2.style.transform = `translate(${lerpX * -25}px, ${lerpY * -18}px)`;
+
+            // ── Layer 2: Header parallax (medium) ──
+            if (header) header.style.transform = `translateX(${lerpX * 6}px) translateY(${lerpY * 4}px)`;
+
+            // ── Layer 3: Main panel subtle 3D tilt ──
+            if (panel) {
+                const rx = lerpY * -3;   // max ±3deg X tilt
+                const ry = lerpX *  4;   // max ±4deg Y tilt
+                panel.style.transform = `perspective(1400px) rotateX(${rx}deg) rotateY(${ry}deg)`;
+            }
+
+            rafId = requestAnimationFrame(animateScene);
+        }
+        rafId = requestAnimationFrame(animateScene);
+
+        // ── Layer 4: Individual data card 3D hover tilt ──
+        document.querySelectorAll('.data-card').forEach(card => {
+            card.addEventListener('mousemove', e => {
+                const r   = card.getBoundingClientRect();
+                const cx  = (e.clientX - r.left) / r.width  - 0.5;
+                const cy  = (e.clientY - r.top)  / r.height - 0.5;
+                card.style.transform = `perspective(600px) rotateX(${-cy * 12}deg) rotateY(${cx * 12}deg) translateZ(6px)`;
+                card.style.boxShadow = `${-cx * 14}px ${-cy * 14}px 40px rgba(6,182,212,0.12), 0 20px 60px rgba(0,0,0,0.4)`;
+            });
+            card.addEventListener('mouseleave', () => {
+                card.style.transform  = '';
+                card.style.boxShadow  = '';
+            });
+        });
+
+        // ── Generate button 3D press effect ──
+        const genBtn = document.getElementById('generate-btn');
+        if (genBtn) {
+            genBtn.addEventListener('mousedown', () => {
+                genBtn.style.transform = 'translateY(3px) scale(0.97)';
+                genBtn.style.boxShadow = '0 0 10px rgba(6,182,212,0.2)';
+            });
+            genBtn.addEventListener('mouseup', () => {
+                genBtn.style.transform = '';
+                genBtn.style.boxShadow = '';
+            });
+        }
+
+        // ── Pause 3D when tab is not visible (perf) ──
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) cancelAnimationFrame(rafId);
+            else rafId = requestAnimationFrame(animateScene);
+        });
+    </script>
 </body>
 </html>

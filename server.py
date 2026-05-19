@@ -18,6 +18,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
 import uvicorn
 
 load_dotenv()
@@ -43,19 +44,6 @@ client = genai.Client(api_key=API_KEY)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("decision_playbook")
 
-app = FastAPI(title="KPI Intelligence Reporter")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-os.makedirs("reports", exist_ok=True)
-app.mount("/reports", StaticFiles(directory="reports"), name="reports")
-
 # -------------------------------------------------------------------
 # Keep-Alive: Ping self every 13 min to prevent Render cold starts
 # -------------------------------------------------------------------
@@ -73,9 +61,23 @@ async def keep_alive_ping():
                 logger.warning(f"[Keep-Alive] Ping failed: {e}")
             await asyncio.sleep(13 * 60)
 
-@app.on_event("startup")
-async def startup_event():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     asyncio.create_task(keep_alive_ping())
+    yield
+
+app = FastAPI(title="KPI Intelligence Reporter", lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+os.makedirs("reports", exist_ok=True)
+app.mount("/reports", StaticFiles(directory="reports"), name="reports")
 
 @app.get("/health")
 async def health_check():
@@ -209,10 +211,15 @@ class OutputSchema(BaseModel):
 async def safe_generate_async(prompt, model=MODEL_NAME, max_retries=6, response_schema=None):
     for attempt in range(max_retries):
         try:
-            config_kwargs = {"response_mime_type": "application/json"}
+            config_kwargs = {
+                "response_mime_type": "application/json",
+                "temperature": 0.0,   # DETERMINISTIC — eliminates hallucination variance
+                "top_p": 1.0,
+                "top_k": 1,
+            }
             if response_schema:
                 config_kwargs["response_schema"] = response_schema
-                
+
             resp = await client.aio.models.generate_content(
                 model=model,
                 contents=prompt,
@@ -222,7 +229,6 @@ async def safe_generate_async(prompt, model=MODEL_NAME, max_retries=6, response_
         except Exception as e:
             err_str = str(e).lower()
             if "429" in err_str or "503" in err_str or "too many requests" in err_str or "overloaded" in err_str:
-                # Random jitter between 2 to 6 seconds prevents "thundering herd" problem
                 jitter = random.uniform(2.0, 6.0)
                 logger.warning(f"Google Rate Limited (Attempt {attempt+1}/{max_retries}). Waiting {jitter:.2f}s...")
                 await asyncio.sleep(jitter)
@@ -231,15 +237,107 @@ async def safe_generate_async(prompt, model=MODEL_NAME, max_retries=6, response_
     raise RuntimeError("Failed after maximum retries due to Google's strict Free-Tier rate limits.")
 
 # -------------------------------------------------------------------
-# Core Single-Pass Agent (Chain of Thought)
+# Agent 0: Data Grounding Agent — pre-computes REAL stats from CSV
+# (prevents hallucination by anchoring projections to actual numbers)
+# -------------------------------------------------------------------
+def compute_data_stats(csv_summary: dict) -> dict:
+    """Extract verified numeric totals/averages from raw CSV data."""
+    def parse_num(val):
+        try:
+            return float(str(val).replace(',', '').replace('$', '').replace('₹', '').replace('%', '').strip())
+        except:
+            return None
+
+    def get_col_stats(rows):
+        if not rows:
+            return {}
+        stats = {}
+        for col in rows[0].keys():
+            nums = [parse_num(r.get(col)) for r in rows]
+            nums = [n for n in nums if n is not None]
+            if nums:
+                stats[col] = {
+                    "total": round(sum(nums), 2),
+                    "average": round(sum(nums) / len(nums), 2),
+                    "min": round(min(nums), 2),
+                    "max": round(max(nums), 2),
+                    "count": len(nums)
+                }
+        return stats
+
+    marketing_stats = get_col_stats(csv_summary.get("marketing_data", []))
+    product_stats   = get_col_stats(csv_summary.get("product_data", []))
+
+    # Compute overall revenue reference (largest total across all numeric cols)
+    all_totals = (
+        [v["total"] for v in marketing_stats.values()] +
+        [v["total"] for v in product_stats.values()]
+    )
+    max_reference = max(all_totals) if all_totals else 100_000
+
+    return {
+        "marketing_stats": marketing_stats,
+        "product_stats":   product_stats,
+        "max_numeric_reference": max_reference,
+    }
+
+
+# -------------------------------------------------------------------
+# Agent 8: Fact-Validator — post-clamps projections to realistic bounds
+# (second layer of hallucination prevention)
+# -------------------------------------------------------------------
+def validate_and_clamp_projections(projections: dict, data_stats: dict) -> dict:
+    """Ensure all projections are mathematically grounded in actual data."""
+    ref = data_stats.get("max_numeric_reference", 100_000)
+    MAX_MULTIPLIER = 2.0   # projections can be AT MOST 2× the biggest actual number
+    MIN_FLOOR      = 0.0
+
+    validated = {}
+    for key, val in projections.items():
+        if isinstance(val, (int, float)):
+            clamped = max(MIN_FLOOR, min(float(val), ref * MAX_MULTIPLIER))
+            if clamped != float(val):
+                logger.warning(f"[Fact-Validator] Clamped '{key}': {val} → {clamped} (ref={ref})")
+            validated[key] = round(clamped, 2)
+        else:
+            validated[key] = val
+    return validated
+
+
+# -------------------------------------------------------------------
+# Core Single-Pass Agent (Chain of Thought) — now data-grounded
 # -------------------------------------------------------------------
 async def run_elastic_pipeline(csv_summary: dict, question: str):
-    logger.info("-> Starting Single-Pass Chain-of-Thought Agent")
-    
+    logger.info("-> Starting Data-Grounded Chain-of-Thought Pipeline")
+
+    # Agent 0: Data Grounding — extract real numbers first
+    data_stats = compute_data_stats(csv_summary)
+    logger.info(f"[Data Grounding] max_reference={data_stats['max_numeric_reference']}")
+
     prompt = f"""
-You are a committee of expert AI agents (Data Analyst, Strategist, Decision Maker, Playbook Creator, Devil's Advocate, Financial Projector, and Board Member).
-You must deeply analyze the data and answer the question by simulating all 7 agents sequentially.
-Return EXACTLY one JSON object with this exact structure:
+You are a committee of expert AI agents: Data Analyst, Strategist, Decision Maker,
+Playbook Creator, Devil's Advocate, Financial Projector, and Board Member.
+
+You MUST analyze ONLY the data provided below. Do NOT invent or assume any numbers
+not present in the data. Every claim must be traceable to the input.
+
+=== VERIFIED DATA STATS (computed from actual input — use these as ground truth) ===
+{json.dumps(data_stats, indent=2)}
+
+=== RAW DATA ===
+{json.dumps(csv_summary, indent=2)}
+
+=== BUSINESS QUESTION ===
+{question}
+
+=== PROJECTION RULES (MANDATORY — violations = invalid response) ===
+- projected_marketing_revenue: MUST be between 0 and {round(data_stats['max_numeric_reference'] * 1.3, 2)}
+- projected_product_revenue:   MUST be between 0 and {round(data_stats['max_numeric_reference'] * 1.3, 2)}
+- optimized_marketing_spend:   MUST be between 0 and {round(data_stats['max_numeric_reference'] * 1.1, 2)}
+- Maximum realistic improvement from AI optimization: 5% to 25% over current actuals
+- Use the verified stats above as the baseline, not assumptions
+
+Return EXACTLY one JSON object with this structure:
 {{
   "analysis_summary": {{ "key_metrics": [{{"name": "str", "reason": "str"}}], "insights": ["str"], "risks_or_gaps": ["str"] }},
   "options": {{ "options": [ {{ "name": "str", "description": "str", "pros": ["str"], "cons": ["str"], "data_support": "str" }} ] }},
@@ -247,35 +345,30 @@ Return EXACTLY one JSON object with this exact structure:
   "playbook": {{ "days": [ {{ "day": 1, "focus": "str", "tasks": ["str"] }} ], "monitoring_plan": "str", "early_warning_signals": ["str"] }},
   "devils_advocate": {{ "main_criticisms": ["str"], "potential_failure_modes": ["str"] }},
   "projections": {{ "projected_marketing_revenue": <number>, "projected_product_revenue": <number>, "optimized_marketing_spend": <number> }},
-  "board_memo": "Write a 400-700 word executive memo in plain text summarizing all the findings, decisions, and execution plans."
+  "board_memo": "Write a 400-700 word executive memo referencing specific numbers from the data."
 }}
-
-IMPORTANT: Do not skip any nested JSON keys. Provide a deep, thoughtful response for 'board_memo'.
-
-CRITICAL PROJECTION GUIDELINES:
-- The "projections" numbers MUST be realistic and mathematically grounded in the provided Data.
-- DO NOT hallucinate massive revenue spikes. Assume a realistic AI optimization impact of 5% to 25% maximum improvement over the current metrics.
-
-Data: {json.dumps(csv_summary)}
-Question: {question}
 """
+
     resp = await safe_generate_async(prompt, response_schema=OutputSchema)
     try:
         parsed = json.loads(extract_text(resp))
     except Exception:
         parsed = {}
-    
-    # Safely construct the final state dictionary exactly as the PDF generator expects it
+
+    # Agent 8: Fact-Validator — clamp projections to realistic bounds
+    raw_projections = parsed.get("projections", {})
+    validated_projections = validate_and_clamp_projections(raw_projections, data_stats)
+
     state = {
-        "csv_summary": csv_summary,
-        "question": question,
+        "csv_summary":      csv_summary,
+        "question":         question,
         "analysis_summary": parsed.get("analysis_summary", {}),
-        "options": parsed.get("options", {}),
-        "decision": parsed.get("decision", {}),
-        "playbook": parsed.get("playbook", {}),
-        "devils_advocate": parsed.get("devils_advocate", {}),
-        "projections": parsed.get("projections", {}),
-        "board_memo": parsed.get("board_memo", "No memo generated.")
+        "options":          parsed.get("options", {}),
+        "decision":         parsed.get("decision", {}),
+        "playbook":         parsed.get("playbook", {}),
+        "devils_advocate":  parsed.get("devils_advocate", {}),
+        "projections":      validated_projections,
+        "board_memo":       parsed.get("board_memo", "No memo generated.")
     }
     return state
 
@@ -383,8 +476,6 @@ async def generate_endpoint(request: Request):
     except Exception as e:
         logger.error(f"Error during generation: {e}")
         return JSONResponse(status_code=500, content={"error": str(e)})
-
-import base64
 
 @app.post("/api/build_pdf")
 async def build_pdf_endpoint(request: Request):
