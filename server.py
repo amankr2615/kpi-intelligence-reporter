@@ -416,11 +416,17 @@ async def serve_index():
 
 @app.get("/styles.css")
 async def serve_css():
-    return FileResponse("styles.css")
+    return FileResponse("styles.css", headers={
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Pragma": "no-cache"
+    })
 
 @app.get("/script.js")
 async def serve_js():
-    return FileResponse("script.js")
+    return FileResponse("script.js", headers={
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Pragma": "no-cache"
+    })
 
 @app.post("/api/generate")
 async def generate_endpoint(request: Request):
