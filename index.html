@@ -22,6 +22,45 @@
         <div class="orb orb-2"></div>
     </div>
 
+    <!-- Secure Boardroom Auth Portal -->
+    <div id="auth-portal" class="auth-overlay">
+        <div class="auth-card">
+            <div class="auth-logo">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"></polyline>
+                    <polyline points="16 7 22 7 22 13"></polyline>
+                </svg>
+                <span>KPI Boardroom Portal</span>
+            </div>
+            <h2 id="auth-title">Executive Access</h2>
+            <p id="auth-subtitle">Verify credentials to review high-end business performance recommendations.</p>
+            
+            <form id="auth-form" onsubmit="event.preventDefault(); handleAuthSubmit();">
+                <div class="input-group">
+                    <label for="auth-email">Corporate Email</label>
+                    <input type="email" id="auth-email" required placeholder="name@company.com">
+                </div>
+                <div class="input-group">
+                    <label for="auth-password">Boardroom Passcode</label>
+                    <input type="password" id="auth-password" required placeholder="••••••••">
+                </div>
+                <button type="submit" id="auth-btn" class="generate-btn auth-submit-btn">Verify Credentials</button>
+            </form>
+
+            <div class="auth-switch">
+                <a href="#" id="auth-switch-link" onclick="toggleAuthMode()">Request Boardroom Access (Sign Up)</a>
+            </div>
+
+            <div class="auth-divider">
+                <span>or</span>
+            </div>
+
+            <button onclick="enterAsGuest()" class="guest-btn">Enter Workspace as Guest</button>
+            
+            <div id="auth-error" class="auth-error-box hidden"></div>
+        </div>
+    </div>
+
     <!-- Nav -->
     <nav class="site-nav">
         <div class="nav-logo">
@@ -31,7 +70,20 @@
             </svg>
             KPI Intelligence
         </div>
-        <div class="nav-tag">Beta</div>
+        <div class="nav-right">
+            <div class="nav-tag">Beta</div>
+            <div id="user-profile" class="user-profile hidden">
+                <span class="user-avatar" id="user-avatar">G</span>
+                <span class="user-email" id="user-email">guest@boardroom.com</span>
+                <button onclick="handleSignOut()" class="logout-btn" title="Sign Out">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                        <polyline points="16 17 21 12 16 7"></polyline>
+                        <line x1="21" y1="12" x2="9" y2="12"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
     </nav>
 
     <div class="app-container">

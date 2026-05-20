@@ -40,6 +40,11 @@ except Exception:
 PORT = int(os.environ.get("PORT", 8000))
 MODEL_NAME = "gemini-2.5-flash"
 
+# Upstash Redis L2 Serverless Cache
+UPSTASH_REDIS_REST_URL = os.getenv("UPSTASH_REDIS_REST_URL")
+UPSTASH_REDIS_REST_TOKEN = os.getenv("UPSTASH_REDIS_REST_TOKEN")
+
+
 # Use the async client for non-blocking concurrent requests
 client = genai.Client(api_key=API_KEY)
 logging.basicConfig(level=logging.INFO)
@@ -92,6 +97,40 @@ REPORT_CACHE = {}  # In-memory L1 cache
 def get_cache_key(csv_summary: dict, question: str) -> str:
     raw_str = json.dumps(csv_summary, sort_keys=True) + question
     return hashlib.sha256(raw_str.encode('utf-8')).hexdigest()
+
+async def redis_get(key: str) -> dict:
+    """Read cache payload from Upstash Redis serverless REST interface."""
+    if not UPSTASH_REDIS_REST_URL or not UPSTASH_REDIS_REST_TOKEN:
+        return None
+    try:
+        headers = {"Authorization": f"Bearer {UPSTASH_REDIS_REST_TOKEN}"}
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(f"{UPSTASH_REDIS_REST_URL}/get/{key}", headers=headers)
+            if resp.status_code == 200:
+                result = resp.json().get("result")
+                return json.loads(result) if result else None
+    except Exception as e:
+        logger.warning(f"[Redis L2] Cache read failed: {e}")
+    return None
+
+async def redis_set(key: str, val: dict, expire_seconds: int = 86400):
+    """Store cache payload to Upstash Redis serverless REST interface."""
+    if not UPSTASH_REDIS_REST_URL or not UPSTASH_REDIS_REST_TOKEN:
+        return
+    try:
+        headers = {"Authorization": f"Bearer {UPSTASH_REDIS_REST_TOKEN}"}
+        async with httpx.AsyncClient() as client:
+            payload = json.dumps(val)
+            await client.post(
+                f"{UPSTASH_REDIS_REST_URL}/set/{key}",
+                content=payload,
+                headers=headers,
+                params={"ex": expire_seconds}
+            )
+            logger.info(f"[Redis L2] Successfully cached report key: {key}")
+    except Exception as e:
+        logger.warning(f"[Redis L2] Cache write failed: {e}")
+
 
 def db_get_cache(cache_key: str):
     """Look up a cached report from Supabase DB."""
@@ -430,6 +469,14 @@ async def serve_js():
         "Pragma": "no-cache"
     })
 
+@app.get("/api/auth/config")
+async def get_auth_config():
+    """Secure endpoint to share client keys without hardcoding them in the script."""
+    return {
+        "supabaseUrl": SUPABASE_URL or "",
+        "supabaseKey": SUPABASE_KEY or ""
+    }
+
 # -------------------------------------------------------------------
 # CodeMender Diagnostics Console Stream
 # -------------------------------------------------------------------
@@ -479,23 +526,38 @@ async def generate_endpoint(request: Request):
         
         csv_summary = {"marketing_data": m_data, "product_data": p_data}
         
-        # 1. L1 In-Memory Cache
+        # 1. L1 In-Memory Cache Check
         cache_key = get_cache_key(csv_summary, question)
         if cache_key in REPORT_CACHE:
             logger.info("🔥 L1 CACHE HIT: Returning report instantly (in-memory).")
             return REPORT_CACHE[cache_key]["response_data"]
 
-        # 2. L2 Supabase DB Cache (survives server restarts)
+        # 2. L2 Upstash Redis Cache Check (Fast serverless cache)
+        redis_cached = await redis_get(cache_key)
+        if redis_cached:
+            logger.info("⚡ L2 REDIS CACHE HIT: Returning report from Upstash Redis.")
+            response_data = {
+                "cache_key": cache_key,
+                "board_memo": redis_cached.get("board_memo", "No memo generated."),
+                "projections": redis_cached.get("projections", {})
+            }
+            # Populate L1 cache
+            REPORT_CACHE[cache_key] = {"state": redis_cached, "response_data": response_data}
+            return response_data
+
+        # 3. L3 Supabase DB Cache Check (survives restarts & persistent fallback)
         db_row = db_get_cache(cache_key)
         if db_row and db_row.get('result_json'):
-            logger.info("⚡ L2 CACHE HIT: Returning report from Supabase DB.")
+            logger.info("⚡ L3 SUPABASE DB CACHE HIT: Returning report from Supabase.")
             response_data = {
                 "cache_key": cache_key,
                 "board_memo": db_row['result_json'].get('board_memo', ''),
                 "projections": db_row['result_json'].get('projections', {}),
                 "pdf_url": db_row.get('pdf_url', '')
             }
+            # Populate L1 cache & L2 Redis
             REPORT_CACHE[cache_key] = {"state": db_row['result_json'], "response_data": response_data}
+            await redis_set(cache_key, db_row['result_json'])
             return response_data
 
         logger.info("Starting Elastic Chain-of-Thought Pipeline...")
@@ -513,8 +575,9 @@ async def generate_endpoint(request: Request):
             "projections": state.get("projections", {})
         }
         
-        # Save to both L1 (memory) and L2 (Supabase DB)
+        # Save to L1 (memory), L2 (Upstash Redis), and L3 (Supabase PostgreSQL DB)
         REPORT_CACHE[cache_key] = {"state": state, "response_data": response_data}
+        await redis_set(cache_key, state)
         db_set_cache(cache_key, question, state)
         return response_data
                 

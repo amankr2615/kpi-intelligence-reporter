@@ -33,6 +33,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupTabs();
     setupFileUploads();
     setupCodeMender();
+    initAuthPortal();
     
     document.getElementById('generate-btn').addEventListener('click', () => {
         generateReport();
@@ -507,3 +508,153 @@ function setupSocialSharing(memoText, pdfUrl) {
         });
     };
 }
+
+// ══════════════════════════════════════
+// SECURE SUPABASE AUTH PORTAL INTEGRATION
+// ══════════════════════════════════════
+let clientSupabaseUrl = "";
+let clientSupabaseKey = "";
+let authMode = "signin"; // signin or signup
+
+async function initAuthPortal() {
+    const portal = document.getElementById('auth-portal');
+    const userProfile = document.getElementById('user-profile');
+    
+    try {
+        // Fetch dynamic credentials from backend config endpoint
+        const configUrl = BACKEND_URL ? `${BACKEND_URL}/api/auth/config` : '/api/auth/config';
+        const res = await fetch(configUrl);
+        const config = await res.json();
+        
+        clientSupabaseUrl = config.supabaseUrl;
+        clientSupabaseKey = config.supabaseKey;
+    } catch (e) {
+        console.error("Failed fetching Supabase credentials:", e);
+    }
+
+    // Auto-login if session exists in localStorage
+    const savedUser = localStorage.getItem('boardroom_user');
+    if (savedUser) {
+        const user = JSON.parse(savedUser);
+        loginUserSession(user.email, user.isGuest);
+    } else {
+        // Show auth portal
+        portal.classList.remove('hidden');
+        userProfile.classList.add('hidden');
+    }
+}
+
+function toggleAuthMode() {
+    const title = document.getElementById('auth-title');
+    const subtitle = document.getElementById('auth-subtitle');
+    const btn = document.getElementById('auth-btn');
+    const link = document.getElementById('auth-switch-link');
+    
+    if (authMode === "signin") {
+        authMode = "signup";
+        title.textContent = "Request Boardroom Access";
+        subtitle.textContent = "Register your corporate email to create a new board-level session.";
+        btn.textContent = "Register & Connect";
+        link.textContent = "Already have credentials? Sign In";
+    } else {
+        authMode = "signin";
+        title.textContent = "Executive Access";
+        subtitle.textContent = "Verify credentials to review high-end business performance recommendations.";
+        btn.textContent = "Verify Credentials";
+        link.textContent = "Request Boardroom Access (Sign Up)";
+    }
+}
+
+async function handleAuthSubmit() {
+    const email = document.getElementById('auth-email').value;
+    const password = document.getElementById('auth-password').value;
+    const errorBox = document.getElementById('auth-error');
+    const btn = document.getElementById('auth-btn');
+
+    errorBox.classList.add('hidden');
+    btn.disabled = true;
+    btn.textContent = "Processing Auth...";
+
+    // Validate config presence
+    if (!clientSupabaseUrl || !clientSupabaseKey) {
+        errorBox.textContent = "System configuration error: Supabase credentials are missing on the backend. Please use 'Enter Workspace as Guest' or set credentials.";
+        errorBox.classList.remove('hidden');
+        btn.disabled = false;
+        btn.textContent = authMode === "signin" ? "Verify Credentials" : "Register & Connect";
+        return;
+    }
+
+    try {
+        let endpoint = "";
+        let bodyPayload = {};
+        
+        if (authMode === "signup") {
+            endpoint = `${clientSupabaseUrl}/auth/v1/signup`;
+            bodyPayload = { email, password };
+        } else {
+            endpoint = `${clientSupabaseUrl}/auth/v1/token?grant_type=password`;
+            bodyPayload = { email, password };
+        }
+
+        const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+                'apikey': clientSupabaseKey,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(bodyPayload)
+        });
+
+        const data = await response.json();
+
+        if (!response.ok || data.error_description || data.error) {
+            throw new Error(data.error_description || data.error || "Authentication failed.");
+        }
+
+        // Successfully authenticated!
+        loginUserSession(email, false);
+
+    } catch (err) {
+        errorBox.textContent = `Access Denied: ${err.message}`;
+        errorBox.classList.remove('hidden');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = authMode === "signin" ? "Verify Credentials" : "Register & Connect";
+    }
+}
+
+function loginUserSession(email, isGuest) {
+    const portal = document.getElementById('auth-portal');
+    const profile = document.getElementById('user-profile');
+    const avatar = document.getElementById('user-avatar');
+    const emailEl = document.getElementById('user-email');
+
+    // Hide Portal overlay, reveal App workspace
+    portal.classList.add('hidden');
+    profile.classList.remove('hidden');
+
+    // Set dynamic session values
+    avatar.textContent = email.charAt(0).toUpperCase();
+    emailEl.textContent = isGuest ? "Guest Access" : email;
+
+    // Save session locally
+    localStorage.setItem('boardroom_user', JSON.stringify({ email, isGuest }));
+}
+
+function enterAsGuest() {
+    loginUserSession("guest@boardroom.com", true);
+}
+
+function handleSignOut() {
+    localStorage.removeItem('boardroom_user');
+    
+    // Show auth portal overlay, hide profile panel
+    document.getElementById('auth-portal').classList.remove('hidden');
+    document.getElementById('user-profile').classList.add('hidden');
+    
+    // Reset forms
+    document.getElementById('auth-email').value = "";
+    document.getElementById('auth-password').value = "";
+    document.getElementById('auth-error').classList.add('hidden');
+}
+
