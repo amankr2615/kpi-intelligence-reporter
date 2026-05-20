@@ -12,3 +12,7 @@ server_master.py
 
 # Reports are hosted on Supabase Storage — no need to push to GitHub
 reports/
+
+# Python cache artifacts
+__pycache__/
+.pytest_cache/

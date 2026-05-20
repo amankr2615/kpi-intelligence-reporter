@@ -54,8 +54,8 @@ PORT = int(os.environ.get("PORT", 8000))
 MODEL_NAME = "gemini-2.5-flash"
 
 # Upstash Redis L2 Serverless Cache
-UPSTASH_REDIS_REST_URL = os.getenv("UPSTASH_REDIS_REST_URL")
-UPSTASH_REDIS_REST_TOKEN = os.getenv("UPSTASH_REDIS_REST_TOKEN")
+UPSTASH_REDIS_REST_URL = os.getenv("UPSTASH_REDIS_REST_URL", "").strip()
+UPSTASH_REDIS_REST_TOKEN = os.getenv("UPSTASH_REDIS_REST_TOKEN", "").strip()
 
 
 # Reusable HTTP client pool to maintain warm sockets and eliminate SSL/handshake latencies (<10ms L2 Redis lookups!)
