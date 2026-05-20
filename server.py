@@ -45,6 +45,9 @@ UPSTASH_REDIS_REST_URL = os.getenv("UPSTASH_REDIS_REST_URL")
 UPSTASH_REDIS_REST_TOKEN = os.getenv("UPSTASH_REDIS_REST_TOKEN")
 
 
+# Reusable HTTP client pool to maintain warm sockets and eliminate SSL/handshake latencies (<10ms L2 Redis lookups!)
+http_client = httpx.AsyncClient(timeout=httpx.Timeout(10.0, connect=3.0))
+
 # Use the async client for non-blocking concurrent requests
 client = genai.Client(api_key=API_KEY)
 logging.basicConfig(level=logging.INFO)
@@ -57,20 +60,21 @@ RENDER_URL = os.getenv("RENDER_EXTERNAL_URL", "")
 
 async def keep_alive_ping():
     await asyncio.sleep(60)
-    async with httpx.AsyncClient() as http:
-        while True:
-            try:
-                if RENDER_URL:
-                    await http.get(f"{RENDER_URL}/health", timeout=10)
-                    logger.info("[Keep-Alive] Pinged self — server stays warm.")
-            except Exception as e:
-                logger.warning(f"[Keep-Alive] Ping failed: {e}")
-            await asyncio.sleep(13 * 60)
+    while True:
+        try:
+            if RENDER_URL:
+                await http_client.get(f"{RENDER_URL}/health", timeout=10)
+                logger.info("[Keep-Alive] Pinged self — server stays warm.")
+        except Exception as e:
+            logger.warning(f"[Keep-Alive] Ping failed: {e}")
+        await asyncio.sleep(13 * 60)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     asyncio.create_task(keep_alive_ping())
     yield
+    # Clean up warm connection sockets on shutdown
+    await http_client.aclose()
 
 app = FastAPI(title="KPI Intelligence Reporter", lifespan=lifespan)
 
@@ -99,35 +103,33 @@ def get_cache_key(csv_summary: dict, question: str) -> str:
     return hashlib.sha256(raw_str.encode('utf-8')).hexdigest()
 
 async def redis_get(key: str) -> dict:
-    """Read cache payload from Upstash Redis serverless REST interface."""
+    """Read cache payload from Upstash Redis serverless REST interface using global http pool."""
     if not UPSTASH_REDIS_REST_URL or not UPSTASH_REDIS_REST_TOKEN:
         return None
     try:
         headers = {"Authorization": f"Bearer {UPSTASH_REDIS_REST_TOKEN}"}
-        async with httpx.AsyncClient() as client:
-            resp = await client.get(f"{UPSTASH_REDIS_REST_URL}/get/{key}", headers=headers)
-            if resp.status_code == 200:
-                result = resp.json().get("result")
-                return json.loads(result) if result else None
+        resp = await http_client.get(f"{UPSTASH_REDIS_REST_URL}/get/{key}", headers=headers)
+        if resp.status_code == 200:
+            result = resp.json().get("result")
+            return json.loads(result) if result else None
     except Exception as e:
         logger.warning(f"[Redis L2] Cache read failed: {e}")
     return None
 
 async def redis_set(key: str, val: dict, expire_seconds: int = 86400):
-    """Store cache payload to Upstash Redis serverless REST interface."""
+    """Store cache payload to Upstash Redis serverless REST interface using global http pool."""
     if not UPSTASH_REDIS_REST_URL or not UPSTASH_REDIS_REST_TOKEN:
         return
     try:
         headers = {"Authorization": f"Bearer {UPSTASH_REDIS_REST_TOKEN}"}
-        async with httpx.AsyncClient() as client:
-            payload = json.dumps(val)
-            await client.post(
-                f"{UPSTASH_REDIS_REST_URL}/set/{key}",
-                content=payload,
-                headers=headers,
-                params={"ex": expire_seconds}
-            )
-            logger.info(f"[Redis L2] Successfully cached report key: {key}")
+        payload = json.dumps(val)
+        await http_client.post(
+            f"{UPSTASH_REDIS_REST_URL}/set/{key}",
+            content=payload,
+            headers=headers,
+            params={"ex": expire_seconds}
+        )
+        logger.info(f"[Redis L2] Successfully cached report key: {key}")
     except Exception as e:
         logger.warning(f"[Redis L2] Cache write failed: {e}")
 
