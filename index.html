@@ -247,6 +247,96 @@
                     </div>
                 </div>
 
+                <!-- DIRECT INTEGRATIONS GATEWAY -->
+                <div class="integrations-section">
+                    <div class="section-title">
+                        <span class="pulse-dot-cyan"></span>
+                        <h3>Boardroom Direct Sync Integrations</h3>
+                    </div>
+                    <p class="section-desc">Skip manual CSV uploads. Sync real-time performance analytics directly from corporate channels.</p>
+                    
+                    <div class="integrations-grid">
+                        <div class="integration-card" onclick="openSyncModal('Google Analytics 4', 'GA4-5829-MEASURE')">
+                            <div class="int-icon ga4-icon">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M18 20V10M12 20V4M6 20v-6"></path>
+                                </svg>
+                            </div>
+                            <div class="int-details">
+                                <h4>Google Analytics 4</h4>
+                                <span>Real-time traffic &amp; conversion sync</span>
+                            </div>
+                            <span class="sync-badge idle">Ready</span>
+                        </div>
+
+                        <div class="integration-card" onclick="openSyncModal('Shopify', 'mystore.myshopify.com')">
+                            <div class="int-icon shopify-icon">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>
+                                    <line x1="3" y1="6" x2="21" y2="6"></line>
+                                    <path d="M16 10a4 4 0 0 1-8 0"></path>
+                                </svg>
+                            </div>
+                            <div class="int-details">
+                                <h4>Shopify Stores</h4>
+                                <span>Product SKU metrics &amp; unit sales</span>
+                            </div>
+                            <span class="sync-badge idle">Ready</span>
+                        </div>
+
+                        <div class="integration-card" onclick="openSyncModal('HubSpot CRM', 'hubspot-portal-92')">
+                            <div class="int-icon hubspot-icon">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                    <circle cx="9" cy="7" r="4"></circle>
+                                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                                </svg>
+                            </div>
+                            <div class="int-details">
+                                <h4>HubSpot Analytics</h4>
+                                <span>Sync corporate customer pipelines</span>
+                            </div>
+                            <span class="sync-badge idle">Ready</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Glassmorphic Direct Sync Dialog Modal -->
+                <div id="sync-modal" class="sync-overlay hidden">
+                    <div class="sync-modal-card">
+                        <div class="sync-modal-header">
+                            <h3 id="sync-target-title">Google Analytics 4 Sync</h3>
+                            <button onclick="closeSyncModal()" class="close-modal-btn">&times;</button>
+                        </div>
+                        
+                        <!-- Configuration Form -->
+                        <div id="sync-form-step">
+                            <p class="sync-modal-subtitle">Secure encrypted API linkage directly to store endpoints.</p>
+                            
+                            <div class="input-group">
+                                <label id="sync-url-label" for="sync-url">Store / Property Domain</label>
+                                <input type="text" id="sync-url" value="" placeholder="e.g. analytics.company.com">
+                            </div>
+                            <div class="input-group">
+                                <label for="sync-api-key">Link Access Token</label>
+                                <input type="password" id="sync-api-key" placeholder="••••••••••••••••••••••••">
+                            </div>
+                            <button onclick="startVisualSync()" class="generate-btn sync-confirm-btn">Confirm &amp; Synchronize Data</button>
+                        </div>
+
+                        <!-- Syncing Animation & Console -->
+                        <div id="sync-progress-step" class="hidden">
+                            <div class="sync-spinner-box">
+                                <div class="sync-pulse-ring"></div>
+                                <span class="sync-pct" id="sync-pct">0%</span>
+                            </div>
+                            <h4 id="sync-status-msg">Initiating secure sync session...</h4>
+                            <div class="sync-mini-logs" id="sync-mini-logs"></div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Question + Generate -->
                 <div class="generate-section">
                     <div class="question-wrap">

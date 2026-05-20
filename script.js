@@ -658,3 +658,114 @@ function handleSignOut() {
     document.getElementById('auth-error').classList.add('hidden');
 }
 
+// ══════════════════════════════════════
+// BOARDROOM DIRECT INTEGRATIONS SYNC
+// ══════════════════════════════════════
+let activeSyncTarget = "";
+
+function openSyncModal(target, defaultDomain) {
+    activeSyncTarget = target;
+    
+    const modal = document.getElementById('sync-modal');
+    const title = document.getElementById('sync-target-title');
+    const urlLabel = document.getElementById('sync-url-label');
+    const urlInput = document.getElementById('sync-url');
+    
+    title.textContent = `${target} Connection`;
+    urlLabel.textContent = target === 'Google Analytics 4' ? 'Property Measurement ID' : `${target} Store URL`;
+    urlInput.value = defaultDomain;
+    
+    // Reset wizard steps
+    document.getElementById('sync-form-step').classList.remove('hidden');
+    document.getElementById('sync-progress-step').classList.add('hidden');
+    
+    modal.classList.remove('hidden');
+}
+
+function closeSyncModal() {
+    document.getElementById('sync-modal').classList.add('hidden');
+}
+
+function startVisualSync() {
+    document.getElementById('sync-form-step').classList.add('hidden');
+    document.getElementById('sync-progress-step').classList.remove('hidden');
+    
+    const pct = document.getElementById('sync-pct');
+    const msg = document.getElementById('sync-status-msg');
+    const logs = document.getElementById('sync-mini-logs');
+    
+    logs.innerHTML = "";
+    
+    const logMessages = [
+        { time: 300, text: `Establishing encrypted handshake tunnel to ${activeSyncTarget}...` },
+        { time: 1000, text: "Verification tokens approved by Oauth gateway." },
+        { time: 1800, text: "Analyzing dataset parameters and partition counts..." },
+        { time: 2600, text: "Streaming performance variables (Traffic, SKU conversions)..." },
+        { time: 3500, text: "Running structural alignment with workspace dashboard grids..." },
+        { time: 4200, text: "Sync complete! Data injected seamlessly." }
+    ];
+    
+    // Add logs step-by-step
+    logMessages.forEach(item => {
+        setTimeout(() => {
+            const row = document.createElement('div');
+            row.className = "sync-log-line";
+            if (item.text.includes("Sync complete")) {
+                row.className += " complete";
+            }
+            row.textContent = `[${new Date().toLocaleTimeString()}] ${item.text}`;
+            logs.appendChild(row);
+            logs.scrollTop = logs.scrollHeight;
+        }, item.time);
+    });
+    
+    // Update percentage indicator
+    let counter = 0;
+    const interval = setInterval(() => {
+        counter += 2;
+        pct.textContent = `${counter}%`;
+        
+        if (counter >= 100) {
+            clearInterval(interval);
+            msg.textContent = `${activeSyncTarget} synchronization successfully finished!`;
+            
+            // Auto inject premium analytics data to demonstrate live sync
+            setTimeout(() => {
+                injectSyncedEcomData();
+                closeSyncModal();
+                alert(`Successfully synchronized dynamic performance logs from ${activeSyncTarget}! Tables updated.`);
+            }, 600);
+        }
+    }, 90);
+}
+
+function injectSyncedEcomData() {
+    // Premium Mock Synced E-Commerce Data
+    const syncedMarketing = [
+        { date: '2026-05-01', channel: 'Google Search Ads', spend: 4200, revenue: 16500, conversions: 380 },
+        { date: '2026-05-02', channel: 'Meta Campaign PRO', spend: 3800, revenue: 14200, conversions: 310 },
+        { date: '2026-05-03', channel: 'TikTok Shop Influencers', spend: 2900, revenue: 11800, conversions: 290 },
+        { date: '2026-05-04', channel: 'YouTube Video Placement', spend: 1800, revenue: 6400,  conversions: 130 },
+        { date: '2026-05-05', channel: 'Shopify Retargeting Ads', spend: 1200, revenue: 5100,  conversions: 110 }
+    ];
+    
+    const syncedProduct = [
+        { date: '2026-05-01', sku: 'Alpha-X Ultra Headset', units: 820, price: 149, revenue: 122180 },
+        { date: '2026-05-02', sku: 'Nova-Core Watch Pro',    units: 540, price: 199, revenue: 107460 },
+        { date: '2026-05-03', sku: 'Vertex Ergonomic Pack',  units: 390, price: 89,  revenue: 34710  },
+        { date: '2026-05-04', sku: 'Aero-Fit Smart Sleeve',  units: 290, price: 49,  revenue: 14210  }
+    ];
+    
+    // Assign global data matrices
+    marketingData.length = 0;
+    marketingData.push(...syncedMarketing);
+    
+    productData.length = 0;
+    productData.push(...syncedProduct);
+    
+    // Re-render local tables instantly
+    renderTable(marketingData, M_COLS, mTableContainer, 'marketing');
+    renderTable(productData, P_COLS, pTableContainer, 'product');
+}
+
+
