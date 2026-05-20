@@ -544,8 +544,8 @@ async function initAuthPortal() {
         const res = await fetch(configUrl);
         const config = await res.json();
         
-        clientSupabaseUrl = config.supabaseUrl;
-        clientSupabaseKey = config.supabaseKey;
+        clientSupabaseUrl = config.supabaseUrl ? config.supabaseUrl.trim() : "";
+        clientSupabaseKey = config.supabaseKey ? config.supabaseKey.trim() : "";
     } catch (e) {
         console.error("Failed fetching Supabase credentials:", e);
     }

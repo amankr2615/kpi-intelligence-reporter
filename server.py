@@ -26,18 +26,18 @@ import sentry_sdk
 
 load_dotenv()
 
-SENTRY_DSN = os.getenv('SENTRY_DSN', '')
+SENTRY_DSN = os.getenv('SENTRY_DSN', '').strip()
 sentry_sdk.init(
     dsn=SENTRY_DSN,
     traces_sample_rate=1.0,
     profiles_sample_rate=1.0,
 )
-API_KEY = os.getenv('GEMINI_API_KEY')
+API_KEY = os.getenv('GEMINI_API_KEY', '').strip()
 if not API_KEY:
     API_KEY = "YOUR_API_KEY_HERE"
 
-SUPABASE_URL = os.getenv('SUPABASE_URL', '')
-SUPABASE_KEY = os.getenv('SUPABASE_KEY', '')
+SUPABASE_URL = os.getenv('SUPABASE_URL', '').strip()
+SUPABASE_KEY = os.getenv('SUPABASE_KEY', '').strip()
 
 # Initialize Supabase client if credentials are available
 try:
