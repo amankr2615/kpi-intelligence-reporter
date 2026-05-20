@@ -20,6 +20,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import uvicorn
+from codemender import mender, heal_async
 
 load_dotenv()
 API_KEY = os.getenv('GEMINI_API_KEY')
@@ -305,8 +306,9 @@ def validate_and_clamp_projections(projections: dict, data_stats: dict) -> dict:
 
 
 # -------------------------------------------------------------------
-# Core Single-Pass Agent (Chain of Thought) — now data-grounded
+# Core Single-Pass Agent (Chain of Thought) — now data-grounded & self-healing
 # -------------------------------------------------------------------
+@heal_async(schema_context="Expected JSON matching OutputSchema: {analysis_summary: dict, options: dict, decision: dict, playbook: dict, devils_advocate: dict, projections: dict, board_memo: string}")
 async def run_elastic_pipeline(csv_summary: dict, question: str):
     logger.info("-> Starting Data-Grounded Chain-of-Thought Pipeline")
 
@@ -428,6 +430,42 @@ async def serve_js():
         "Pragma": "no-cache"
     })
 
+# -------------------------------------------------------------------
+# CodeMender Diagnostics Console Stream
+# -------------------------------------------------------------------
+from fastapi.responses import StreamingResponse
+
+@app.get("/api/codemender/stream")
+async def codemender_stream(request: Request):
+    """EventSource streaming endpoint for real-time CodeMender auto-repair telemetry."""
+    return StreamingResponse(
+        mender.get_event_stream(),
+        media_type="text/event-stream"
+    )
+
+@app.post("/api/codemender/simulate_error")
+async def simulate_error():
+    """Endpoint to trigger a simulated repair to demonstrate self-healing in action."""
+    loop = asyncio.get_running_loop()
+    mender.log_event(
+        event_type="intercept",
+        message="Simulated system crash intercepted in database mapping interface.",
+        original="SELECT * FROM metrics_log WHERE value = 'NaN_STALE';",
+        error_msg="ValueError: Cannot map metric value 'NaN_STALE' to PostgreSQL FLOAT8 column."
+    )
+    
+    # Run repair mock asynchronously
+    async def run_repair():
+        await asyncio.sleep(1.2)
+        await mender.heal_data(
+            original_data="SELECT * FROM metrics_log WHERE value = 'NaN_STALE';",
+            error_msg="ValueError: Cannot map metric value 'NaN_STALE' to PostgreSQL FLOAT8 column.",
+            schema_context="Correct sql value mapping to standard FLOAT (e.g. replace 'NaN_STALE' with 0.0)"
+        )
+    asyncio.create_task(run_repair())
+    
+    return {"status": "Simulated error initiated. Watch CodeMender live heal!"}
+
 @app.post("/api/generate")
 async def generate_endpoint(request: Request):
     try:
@@ -468,9 +506,10 @@ async def generate_endpoint(request: Request):
 
         logger.info(f"Pipeline finished successfully in {time.time() - start_time:.2f} seconds.")
 
+        # Ensure board_memo header formatting is structured even if AI omitted parts
         response_data = {
             "cache_key": cache_key,
-            "board_memo": state.get("board_memo", ""),
+            "board_memo": state.get("board_memo", "No memo generated."),
             "projections": state.get("projections", {})
         }
         

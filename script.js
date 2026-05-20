@@ -32,6 +32,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderTable(productData, P_COLS, pTableContainer, 'product');
     setupTabs();
     setupFileUploads();
+    setupCodeMender();
     
     document.getElementById('generate-btn').addEventListener('click', () => {
         generateReport();
@@ -217,6 +218,123 @@ async function generateReport() {
         document.getElementById('loading-state').classList.add('hidden');
         document.getElementById('error-state').classList.remove('hidden');
         document.getElementById('error-state').textContent = error.message;
+    }
+}
+
+// ── CodeMender Live Diagnostics Engine Integration ──
+function setupCodeMender() {
+    const logo = document.querySelector('.nav-logo');
+    const consoleEl = document.getElementById('codemender-console');
+    const logsContainer = document.getElementById('mender-logs');
+    const repairsCount = document.getElementById('mender-repairs');
+    const latencyMetric = document.getElementById('mender-latency');
+    const simBtn = document.getElementById('simulate-error-btn');
+
+    let clickCount = 0;
+    let clickTimeout;
+
+    if (!logo || !consoleEl) return;
+
+    // Secret Activation Shortcut: Triple-click logo to toggle console
+    logo.style.cursor = 'pointer';
+    logo.addEventListener('click', () => {
+        clickCount++;
+        clearTimeout(clickTimeout);
+        
+        if (clickCount === 3) {
+            consoleEl.classList.toggle('hidden-console');
+            // Flash console styling to grab developer attention
+            consoleEl.scrollIntoView({ behavior: 'smooth' });
+            clickCount = 0;
+            addConsoleRow("system", "Developer secret mode activated. Live diagnostics link online.");
+        }
+        
+        clickTimeout = setTimeout(() => {
+            clickCount = 0;
+        }, 1200);
+    });
+
+    // SSE EventSource listener for real-time telemetry
+    const streamUrl = BACKEND_URL ? `${BACKEND_URL}/api/codemender/stream` : '/api/codemender/stream';
+    const es = new EventSource(streamUrl);
+
+    es.onmessage = (event) => {
+        try {
+            const data = JSON.parse(event.data);
+            
+            if (data.type === 'status') {
+                repairsCount.textContent = data.repairs || 0;
+                latencyMetric.textContent = `${data.avg_time || 0}ms`;
+                return;
+            }
+
+            if (data.type === 'intercept') {
+                addConsoleRow("intercept", `[INTERCEPTED] ${data.message}`);
+                addConsoleRow("fail", `Error: ${data.error.split('\n')[0]}`);
+            } else if (data.type === 'repair') {
+                addConsoleRow("repair", `[HEALED] ${data.message}`);
+                
+                // Render before-and-after payload diff block
+                const diffBox = document.createElement('div');
+                diffBox.className = 'diff-box';
+                diffBox.innerHTML = `
+                    <div class="diff-header">Auto-Healed Code / Payload Diff</div>
+                    <span class="diff-red">- Original: ${escapeHtml(data.original)}</span>
+                    <span class="diff-green">+ Corrected: ${escapeHtml(data.repaired)}</span>
+                `;
+                logsContainer.appendChild(diffBox);
+                logsContainer.scrollTop = logsContainer.scrollHeight;
+
+                // Update counters
+                repairsCount.textContent = parseInt(repairsCount.textContent) + 1;
+            } else if (data.type === 'failure') {
+                addConsoleRow("fail", `[CRITICAL FAILURE] ${data.message} Error: ${data.error}`);
+            }
+        } catch (err) {
+            console.error("Failed parsing telemetry event:", err);
+        }
+    };
+
+    es.onerror = () => {
+        // Silent reconnection fallback
+    };
+
+    // Simulated Error Button Handler
+    if (simBtn) {
+        simBtn.addEventListener('click', async () => {
+            try {
+                simBtn.disabled = true;
+                simBtn.textContent = "Simulating...";
+                const simUrl = BACKEND_URL ? `${BACKEND_URL}/api/codemender/simulate_error` : '/api/codemender/simulate_error';
+                await fetch(simUrl, { method: 'POST' });
+                setTimeout(() => {
+                    simBtn.disabled = false;
+                    simBtn.textContent = "Simulate Data Crash";
+                }, 2000);
+            } catch (err) {
+                console.error("Failed invoking simulation:", err);
+                simBtn.disabled = false;
+                simBtn.textContent = "Simulate Data Crash";
+            }
+        });
+    }
+
+    function addConsoleRow(type, text) {
+        const row = document.createElement('div');
+        row.className = `mender-log-row ${type}-msg`;
+        const time = new Date().toLocaleTimeString();
+        row.innerHTML = `<span class="mender-time">[${time}]</span> ${text}`;
+        logsContainer.appendChild(row);
+        logsContainer.scrollTop = logsContainer.scrollHeight;
+    }
+
+    function escapeHtml(unsafe) {
+        return unsafe
+             .replace(/&/g, "&amp;")
+             .replace(/</g, "&lt;")
+             .replace(/>/g, "&gt;")
+             .replace(/"/g, "&quot;")
+             .replace(/'/g, "&#039;");
     }
 }
 

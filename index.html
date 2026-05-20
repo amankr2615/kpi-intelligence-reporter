@@ -267,10 +267,8 @@
                             <span class="label-dot green-dot"></span>
                             After AI Analysis
                         </div>
-                        <canvas id="afterChart"></canvas>
                     </div>
                 </div>
-
                 <!-- Download & Share -->
                 <div id="pdf-download-container" class="hidden action-section">
                     <a id="download-pdf-btn" href="#" target="_blank" class="download-btn">
@@ -298,6 +296,29 @@
                 </div>
             </div>
 
+            <!-- Secret CodeMender Diagnostics Console (Hidden by default, activated via secret shortcut) -->
+            <div id="codemender-console" class="codemender-panel hidden-console">
+                <div class="mender-header">
+                    <div class="mender-title">
+                        <span class="pulse-dot"></span>
+                        CodeMender™ Live Diagnostics Engine
+                    </div>
+                    <div class="mender-meta">
+                        <span>Repairs: <strong id="mender-repairs">0</strong></span>
+                        <span class="sep">|</span>
+                        <span>Avg Recovery: <strong id="mender-latency">0ms</strong></span>
+                    </div>
+                </div>
+                <div class="mender-logs-container" id="mender-logs">
+                    <div class="mender-log-row system-msg">
+                        <span class="mender-time">[SYSTEM]</span> CodeMender diagnostics connection initialized. Monitoring background thread...
+                    </div>
+                </div>
+                <div class="mender-footer">
+                    <span class="sec-label">ADMIN MODE ENABLED</span>
+                    <button class="simulate-err-btn" id="simulate-error-btn">Simulate Data Crash</button>
+            </div>
+            </div>
         </main>
 
         <footer class="site-footer">
