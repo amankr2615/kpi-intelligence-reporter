@@ -9,4 +9,3 @@ httpx
 supabase
 sentry-sdk
 pytest
-httpx
