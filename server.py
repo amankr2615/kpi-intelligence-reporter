@@ -22,8 +22,16 @@ from contextlib import asynccontextmanager
 import uvicorn
 from codemender import mender, heal_async
 from forecaster import run_regression_forecasting
+import sentry_sdk
 
 load_dotenv()
+
+SENTRY_DSN = os.getenv('SENTRY_DSN', '')
+sentry_sdk.init(
+    dsn=SENTRY_DSN,
+    traces_sample_rate=1.0,
+    profiles_sample_rate=1.0,
+)
 API_KEY = os.getenv('GEMINI_API_KEY')
 if not API_KEY:
     API_KEY = "YOUR_API_KEY_HERE"
@@ -649,6 +657,43 @@ async def build_pdf_endpoint(request: Request):
         return {"pdf_url": pdf_public_url}
     except Exception as e:
         logger.error(f"Error during PDF build: {e}")
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+@app.post("/api/integrations/sync")
+async def integrations_sync_endpoint(request: Request):
+    try:
+        body = await request.json()
+        target = body.get("target", "Shopify")
+        domain = body.get("domain", "")
+        token = body.get("token", "")
+        
+        logger.info(f"Initiating backend direct sync for {target} on {domain}")
+        # Simulate OAuth validation and API response latency (simulating a real connection delay)
+        await asyncio.sleep(1.5)
+        
+        # Premium Mock Synced E-Commerce Data matching M_COLS & P_COLS schemas perfectly
+        syncedMarketing = [
+            { "date": '2026-05-01', "channel": 'Google Search Ads', "spend": 4200, "clicks": 1250, "conversions": 380, "revenue": 16500 },
+            { "date": '2026-05-02', "channel": 'Meta Campaign PRO', "spend": 3800, "clicks": 980,  "conversions": 310, "revenue": 14200 },
+            { "date": '2026-05-03', "channel": 'TikTok Shop Influencers', "spend": 2900, "clicks": 1450, "conversions": 290, "revenue": 11800 },
+            { "date": '2026-05-04', "channel": 'YouTube Video Placement', "spend": 1800, "clicks": 540,  "conversions": 130, "revenue": 6400 },
+            { "date": '2026-05-05', "channel": 'Shopify Retargeting Ads', "spend": 1200, "clicks": 390,  "conversions": 110, "revenue": 5100 }
+        ]
+        
+        syncedProduct = [
+            { "date": '2026-05-01', "product": 'Alpha-X Ultra Headset', "units_sold": 820, "price": 149, "revenue": 122180, "region": 'Global' },
+            { "date": '2026-05-02', "product": 'Nova-Core Watch Pro',    "units_sold": 540, "price": 199, "revenue": 107460, "region": 'Global' },
+            { "date": '2026-05-03', "product": 'Vertex Ergonomic Pack',  "units_sold": 390, "price": 89,  "revenue": 34710,  "region": 'Global' },
+            { "date": '2026-05-04', "product": 'Aero-Fit Smart Sleeve',  "units_sold": 290, "price": 49,  "revenue": 14210,  "region": 'Global' }
+        ]
+        
+        return {
+            "status": "success",
+            "marketing_data": syncedMarketing,
+            "product_data": syncedProduct
+        }
+    except Exception as e:
+        logger.error(f"Error during integration sync: {e}")
         return JSONResponse(status_code=500, content={"error": str(e)})
 
 if __name__ == '__main__':

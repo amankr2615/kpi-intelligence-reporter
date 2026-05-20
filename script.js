@@ -704,7 +704,7 @@ function closeSyncModal() {
     document.getElementById('sync-modal').classList.add('hidden');
 }
 
-function startVisualSync() {
+async function startVisualSync() {
     document.getElementById('sync-form-step').classList.add('hidden');
     document.getElementById('sync-progress-step').classList.remove('hidden');
     
@@ -713,6 +713,17 @@ function startVisualSync() {
     const logs = document.getElementById('sync-mini-logs');
     
     logs.innerHTML = "";
+    
+    const domain = document.getElementById('sync-url').value;
+    const token = document.getElementById('sync-api-key').value;
+    
+    // Start backend request
+    const syncUrl = BACKEND_URL ? `${BACKEND_URL}/api/integrations/sync` : '/api/integrations/sync';
+    const syncPromise = fetch(syncUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ target: activeSyncTarget, domain, token })
+    }).then(res => res.json());
     
     const logMessages = [
         { time: 300, text: `Establishing encrypted handshake tunnel to ${activeSyncTarget}...` },
@@ -739,7 +750,7 @@ function startVisualSync() {
     
     // Update percentage indicator
     let counter = 0;
-    const interval = setInterval(() => {
+    const interval = setInterval(async () => {
         counter += 2;
         pct.textContent = `${counter}%`;
         
@@ -747,33 +758,26 @@ function startVisualSync() {
             clearInterval(interval);
             msg.textContent = `${activeSyncTarget} synchronization successfully finished!`;
             
-            // Auto inject premium analytics data to demonstrate live sync
-            setTimeout(() => {
-                injectSyncedEcomData();
+            try {
+                const responseData = await syncPromise;
+                if (responseData.status === "success") {
+                    injectSyncedEcomData(responseData.marketing_data, responseData.product_data);
+                    closeSyncModal();
+                    alert(`Successfully synchronized dynamic performance logs from ${activeSyncTarget}! Tables updated.`);
+                } else {
+                    alert(`Sync failed: ${responseData.error}`);
+                    closeSyncModal();
+                }
+            } catch (err) {
+                console.error("Backend sync failed", err);
+                alert("Failed to connect to backend sync endpoint.");
                 closeSyncModal();
-                alert(`Successfully synchronized dynamic performance logs from ${activeSyncTarget}! Tables updated.`);
-            }, 600);
+            }
         }
     }, 90);
 }
 
-function injectSyncedEcomData() {
-    // Premium Mock Synced E-Commerce Data matching M_COLS & P_COLS schemas perfectly
-    const syncedMarketing = [
-        { date: '2026-05-01', channel: 'Google Search Ads', spend: 4200, clicks: 1250, conversions: 380, revenue: 16500 },
-        { date: '2026-05-02', channel: 'Meta Campaign PRO', spend: 3800, clicks: 980,  conversions: 310, revenue: 14200 },
-        { date: '2026-05-03', channel: 'TikTok Shop Influencers', spend: 2900, clicks: 1450, conversions: 290, revenue: 11800 },
-        { date: '2026-05-04', channel: 'YouTube Video Placement', spend: 1800, clicks: 540,  conversions: 130, revenue: 6400 },
-        { date: '2026-05-05', channel: 'Shopify Retargeting Ads', spend: 1200, clicks: 390,  conversions: 110, revenue: 5100 }
-    ];
-    
-    const syncedProduct = [
-        { date: '2026-05-01', product: 'Alpha-X Ultra Headset', units_sold: 820, price: 149, revenue: 122180, region: 'Global' },
-        { date: '2026-05-02', product: 'Nova-Core Watch Pro',    units_sold: 540, price: 199, revenue: 107460, region: 'Global' },
-        { date: '2026-05-03', product: 'Vertex Ergonomic Pack',  units_sold: 390, price: 89,  revenue: 34710,  region: 'Global' },
-        { date: '2026-05-04', product: 'Aero-Fit Smart Sleeve',  units_sold: 290, price: 49,  revenue: 14210,  region: 'Global' }
-    ];
-    
+function injectSyncedEcomData(syncedMarketing, syncedProduct) {
     // Assign global data matrices
     marketingData.length = 0;
     marketingData.push(...syncedMarketing);
