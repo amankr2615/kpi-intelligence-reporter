@@ -6,10 +6,24 @@ on:
       - main
 
 jobs:
-  deploy:
+  test-and-deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Trigger Render Deploy
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run Tests (Pytest)
+        run: pytest tests/
+
+      - name: Trigger Render Deploy (Only if tests pass)
         run: |
           curl -s "${{ secrets.RENDER_DEPLOY_HOOK_URL }}" > /dev/null
-          echo "✅ Deploy triggered on Render!"
+          echo "✅ Tests passed! Deploy triggered on Render."

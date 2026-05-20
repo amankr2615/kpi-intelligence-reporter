@@ -175,7 +175,8 @@ async function generateReport() {
             body: JSON.stringify({ 
                 marketingData: marketingData, 
                 productData: productData,
-                question: question
+                question: question,
+                webhookUrl: document.getElementById('webhook-url').value
             })
         });
 

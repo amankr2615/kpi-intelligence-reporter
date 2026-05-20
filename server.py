@@ -46,6 +46,10 @@ try:
 except Exception:
     supabase_client = None
 
+# Initialize RAG Engine
+from rag_engine import init_rag, get_rag_context
+init_rag(API_KEY)
+
 PORT = int(os.environ.get("PORT", 8000))
 MODEL_NAME = "gemini-2.5-flash"
 
@@ -366,12 +370,18 @@ async def run_elastic_pipeline(csv_summary: dict, question: str, forecast_stats:
     data_stats = compute_data_stats(csv_summary)
     logger.info(f"[Data Grounding] max_reference={data_stats['max_numeric_reference']}")
 
+    # Retrieve RAG Context (Industry Benchmarks)
+    rag_context = get_rag_context(question)
+    benchmark_section = f"=== INDUSTRY BENCHMARKS ===\n{rag_context}\n" if rag_context else ""
+
     prompt = f"""
 You are a committee of expert AI agents: Data Analyst, Strategist, Decision Maker,
 Playbook Creator, Devil's Advocate, Financial Projector, and Board Member.
 
 You MUST analyze ONLY the data provided below. Do NOT invent or assume any numbers
 not present in the data. Every claim must be traceable to the input.
+
+{benchmark_section}
 
 === VERIFIED DATA STATS (computed from actual input — use these as ground truth) ===
 {json.dumps(data_stats, indent=2)}
@@ -592,6 +602,11 @@ async def generate_endpoint(request: Request):
         state = await run_elastic_pipeline(csv_summary, question, forecast_stats)
 
         logger.info(f"Pipeline finished successfully in {time.time() - start_time:.2f} seconds.")
+
+        # 4. Trigger Webhook Alerts (Background)
+        webhook_url = body.get('webhookUrl', '')
+        from notifier import check_and_fire_alerts
+        check_and_fire_alerts(state, forecast_stats, webhook_url)
 
         # Ensure board_memo header formatting is structured even if AI omitted parts
         response_data = {
