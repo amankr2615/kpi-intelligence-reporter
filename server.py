@@ -537,15 +537,22 @@ async def generate_endpoint(request: Request):
         # 2. L2 Upstash Redis Cache Check (Fast serverless cache)
         redis_cached = await redis_get(cache_key)
         if redis_cached:
-            logger.info("⚡ L2 REDIS CACHE HIT: Returning report from Upstash Redis.")
-            response_data = {
-                "cache_key": cache_key,
-                "board_memo": redis_cached.get("board_memo", "No memo generated."),
-                "projections": redis_cached.get("projections", {})
-            }
-            # Populate L1 cache
-            REPORT_CACHE[cache_key] = {"state": redis_cached, "response_data": response_data}
-            return response_data
+            if isinstance(redis_cached, str):
+                try:
+                    redis_cached = json.loads(redis_cached)
+                except Exception:
+                    redis_cached = None
+            
+            if isinstance(redis_cached, dict):
+                logger.info("⚡ L2 REDIS CACHE HIT: Returning report from Upstash Redis.")
+                response_data = {
+                    "cache_key": cache_key,
+                    "board_memo": redis_cached.get("board_memo", "No memo generated."),
+                    "projections": redis_cached.get("projections", {})
+                }
+                # Populate L1 cache
+                REPORT_CACHE[cache_key] = {"state": redis_cached, "response_data": response_data}
+                return response_data
 
         # 3. L3 Supabase DB Cache Check (survives restarts & persistent fallback)
         db_row = db_get_cache(cache_key)
