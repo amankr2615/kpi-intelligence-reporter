@@ -411,6 +411,35 @@
                         </div>
                         <canvas id="afterChart"></canvas>
                     </div>
+                    
+                    <!-- Predictive Regression Insights Card -->
+                    <div class="chart-card forecast-card" id="forecast-insights-card">
+                        <div class="chart-label forecast-label">
+                            <span class="label-dot cyan-dot"></span>
+                            Predictive Regression Insights
+                        </div>
+                        <div class="forecast-stats-box">
+                            <div class="stat-row">
+                                <span class="stat-name">Marketing Spend Slope</span>
+                                <span class="stat-val" id="stat-spend-slope">N/A</span>
+                            </div>
+                            <div class="stat-row">
+                                <span class="stat-name">Spend Model Fit (R²)</span>
+                                <span class="stat-val" id="stat-spend-r2">N/A</span>
+                            </div>
+                            <div class="stat-row border-top">
+                                <span class="stat-name">Projected 30d Spend</span>
+                                <span class="stat-val accent-cyan" id="stat-proj-spend">N/A</span>
+                            </div>
+                            <div class="stat-row">
+                                <span class="stat-name">Projected 30d Product Revenue</span>
+                                <span class="stat-val accent-emerald" id="stat-proj-prev">N/A</span>
+                            </div>
+                        </div>
+                        <div class="forecast-card-footer">
+                            Least-Squares Linear Model Active
+                        </div>
+                    </div>
                 </div>
                 <!-- Download & Share -->
                 <div id="pdf-download-container" class="hidden action-section">

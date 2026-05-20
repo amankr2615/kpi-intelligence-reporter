@@ -21,6 +21,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import uvicorn
 from codemender import mender, heal_async
+from forecaster import run_regression_forecasting
 
 load_dotenv()
 API_KEY = os.getenv('GEMINI_API_KEY')
@@ -350,7 +351,7 @@ def validate_and_clamp_projections(projections: dict, data_stats: dict) -> dict:
 # Core Single-Pass Agent (Chain of Thought) — now data-grounded & self-healing
 # -------------------------------------------------------------------
 @heal_async(schema_context="Expected JSON matching OutputSchema: {analysis_summary: dict, options: dict, decision: dict, playbook: dict, devils_advocate: dict, projections: dict, board_memo: string}")
-async def run_elastic_pipeline(csv_summary: dict, question: str):
+async def run_elastic_pipeline(csv_summary: dict, question: str, forecast_stats: dict = None):
     logger.info("-> Starting Data-Grounded Chain-of-Thought Pipeline")
 
     # Agent 0: Data Grounding — extract real numbers first
@@ -366,6 +367,9 @@ not present in the data. Every claim must be traceable to the input.
 
 === VERIFIED DATA STATS (computed from actual input — use these as ground truth) ===
 {json.dumps(data_stats, indent=2)}
+
+=== MATHEMATICAL TIME-SERIES REGRESSION FORECASTS (computed locally via Forecaster Engine) ===
+{json.dumps(forecast_stats, indent=2) if forecast_stats else "N/A"}
 
 === RAW DATA ===
 {json.dumps(csv_summary, indent=2)}
@@ -569,11 +573,15 @@ async def generate_endpoint(request: Request):
             await redis_set(cache_key, db_row['result_json'])
             return response_data
 
+        # Compute local time-series regression models in microseconds
+        logger.info("[Forecaster] Pre-calculating statistical forecasts...")
+        forecast_stats = run_regression_forecasting(m_data, p_data)
+
         logger.info("Starting Elastic Chain-of-Thought Pipeline...")
         start_time = time.time()
         
         # 3. Async Execution + Jitter Backoff
-        state = await run_elastic_pipeline(csv_summary, question)
+        state = await run_elastic_pipeline(csv_summary, question, forecast_stats)
 
         logger.info(f"Pipeline finished successfully in {time.time() - start_time:.2f} seconds.")
 
@@ -581,7 +589,8 @@ async def generate_endpoint(request: Request):
         response_data = {
             "cache_key": cache_key,
             "board_memo": state.get("board_memo", "No memo generated."),
-            "projections": state.get("projections", {})
+            "projections": state.get("projections", {}),
+            "forecast": forecast_stats
         }
         
         # Save to L1 (memory), L2 (Upstash Redis), and L3 (Supabase PostgreSQL DB)

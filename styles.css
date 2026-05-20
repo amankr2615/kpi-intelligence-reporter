@@ -414,8 +414,7 @@ td input:focus { border-color: var(--cyan); background: rgba(6,182,212,0.04); }
 .empty-state span { font-size: 0.83rem; color: var(--muted); max-width: 380px; display: block; margin: 0 auto; line-height: 1.7; }
 
 /* ── Dashboards ── */
-.dashboards-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 26px; }
-@media (max-width: 640px) { .dashboards-grid { grid-template-columns: 1fr; } }
+.dashboards-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; margin-top: 26px; }
 
 .chart-card {
   background: var(--surface); border: 1px solid var(--border);
@@ -431,10 +430,63 @@ td input:focus { border-color: var(--cyan); background: rgba(6,182,212,0.04); }
 }
 .before-label { color: #f87171; }
 .after-label  { color: var(--emerald); }
+.forecast-label { color: var(--cyan); }
 
 .label-dot { width: 7px; height: 7px; border-radius: 50%; }
 .red-dot   { background: #f87171; box-shadow: 0 0 6px #f87171; }
 .green-dot { background: var(--emerald); box-shadow: 0 0 6px var(--emerald); }
+.cyan-dot  { background: var(--cyan); box-shadow: 0 0 6px var(--cyan); }
+
+/* ── Predictive Forecast Card Styles ── */
+.forecast-stats-box {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 18px 0;
+}
+
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.82rem;
+  color: var(--muted2);
+}
+
+.stat-row.border-top {
+  border-top: 1px dashed var(--border);
+  padding-top: 12px;
+  margin-top: 4px;
+}
+
+.stat-name {
+  font-weight: 500;
+}
+
+.stat-val {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.accent-cyan {
+  color: var(--cyan);
+}
+
+.accent-emerald {
+  color: var(--emerald);
+}
+
+.forecast-card-footer {
+  font-size: 0.68rem;
+  color: var(--muted);
+  text-align: center;
+  border-top: 1px dashed var(--border);
+  padding-top: 10px;
+  margin-top: 14px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
 
 /* ── Action Section ── */
 .action-section { margin-top: 30px; display: flex; flex-direction: column; align-items: center; gap: 14px; }

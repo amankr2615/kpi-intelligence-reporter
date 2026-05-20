@@ -187,7 +187,7 @@ async function generateReport() {
 
         // 1. Render Dashboards instantly (animations disabled)
         document.getElementById('dashboards-container').classList.remove('hidden');
-        renderDashboards(data.projections);
+        renderDashboards(data);
 
         // Give the browser 500ms to physically paint the charts before we screenshot them
         await new Promise(resolve => setTimeout(resolve, 500));
@@ -414,7 +414,10 @@ function renderReport(data) {
 let beforeChartInstance = null;
 let afterChartInstance = null;
 
-function renderDashboards(projections) {
+function renderDashboards(data) {
+    const projections = data ? data.projections : null;
+    const forecast = data ? data.forecast : null;
+    
     // 1. Calculate "Before" Data from global variables
     const mSpend = marketingData.reduce((sum, d) => sum + (parseFloat(d.spend) || 0), 0);
     const mRev = marketingData.reduce((sum, d) => sum + (parseFloat(d.revenue) || 0), 0);
@@ -424,6 +427,21 @@ function renderDashboards(projections) {
     const projMRev = projections ? projections.projected_marketing_revenue : (mRev * 1.2);
     const projPRev = projections ? projections.projected_product_revenue : (pRev * 1.15);
     const optSpend = projections ? projections.optimized_marketing_spend : mSpend;
+
+    // Update Forecast Insight Card
+    if (forecast && forecast.status === "success") {
+        const fmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+        
+        const slope = forecast.marketing_metrics.spend_trend_slope;
+        const slopeStr = (slope >= 0 ? "+" : "") + fmt.format(slope) + "/day";
+        document.getElementById('stat-spend-slope').textContent = slopeStr;
+        
+        const r2 = forecast.marketing_metrics.spend_r_squared;
+        document.getElementById('stat-spend-r2').textContent = (r2 * 100).toFixed(1) + "%";
+        
+        document.getElementById('stat-proj-spend').textContent = fmt.format(forecast.marketing_metrics.projected_30d_spend);
+        document.getElementById('stat-proj-prev').textContent = fmt.format(forecast.product_metrics.projected_30d_revenue);
+    }
 
     // 3. Balance Scales (find maximum value across both charts and add 10% padding)
     const allValues = [mSpend, mRev, pRev, optSpend, projMRev, projPRev];
@@ -740,20 +758,20 @@ function startVisualSync() {
 }
 
 function injectSyncedEcomData() {
-    // Premium Mock Synced E-Commerce Data
+    // Premium Mock Synced E-Commerce Data matching M_COLS & P_COLS schemas perfectly
     const syncedMarketing = [
-        { date: '2026-05-01', channel: 'Google Search Ads', spend: 4200, revenue: 16500, conversions: 380 },
-        { date: '2026-05-02', channel: 'Meta Campaign PRO', spend: 3800, revenue: 14200, conversions: 310 },
-        { date: '2026-05-03', channel: 'TikTok Shop Influencers', spend: 2900, revenue: 11800, conversions: 290 },
-        { date: '2026-05-04', channel: 'YouTube Video Placement', spend: 1800, revenue: 6400,  conversions: 130 },
-        { date: '2026-05-05', channel: 'Shopify Retargeting Ads', spend: 1200, revenue: 5100,  conversions: 110 }
+        { date: '2026-05-01', channel: 'Google Search Ads', spend: 4200, clicks: 1250, conversions: 380, revenue: 16500 },
+        { date: '2026-05-02', channel: 'Meta Campaign PRO', spend: 3800, clicks: 980,  conversions: 310, revenue: 14200 },
+        { date: '2026-05-03', channel: 'TikTok Shop Influencers', spend: 2900, clicks: 1450, conversions: 290, revenue: 11800 },
+        { date: '2026-05-04', channel: 'YouTube Video Placement', spend: 1800, clicks: 540,  conversions: 130, revenue: 6400 },
+        { date: '2026-05-05', channel: 'Shopify Retargeting Ads', spend: 1200, clicks: 390,  conversions: 110, revenue: 5100 }
     ];
     
     const syncedProduct = [
-        { date: '2026-05-01', sku: 'Alpha-X Ultra Headset', units: 820, price: 149, revenue: 122180 },
-        { date: '2026-05-02', sku: 'Nova-Core Watch Pro',    units: 540, price: 199, revenue: 107460 },
-        { date: '2026-05-03', sku: 'Vertex Ergonomic Pack',  units: 390, price: 89,  revenue: 34710  },
-        { date: '2026-05-04', sku: 'Aero-Fit Smart Sleeve',  units: 290, price: 49,  revenue: 14210  }
+        { date: '2026-05-01', product: 'Alpha-X Ultra Headset', units_sold: 820, price: 149, revenue: 122180, region: 'Global' },
+        { date: '2026-05-02', product: 'Nova-Core Watch Pro',    units_sold: 540, price: 199, revenue: 107460, region: 'Global' },
+        { date: '2026-05-03', product: 'Vertex Ergonomic Pack',  units_sold: 390, price: 89,  revenue: 34710,  region: 'Global' },
+        { date: '2026-05-04', product: 'Aero-Fit Smart Sleeve',  units_sold: 290, price: 49,  revenue: 14210,  region: 'Global' }
     ];
     
     // Assign global data matrices
