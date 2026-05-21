@@ -463,6 +463,8 @@ function renderDashboards(data) {
 
     const chartOptions = {
         responsive: true,
+        maintainAspectRatio: true,
+        aspectRatio: 1.4,
         animation: false,
         plugins: {
             customCanvasBackgroundColor: { color: 'white' }
