@@ -43,11 +43,14 @@ Additionally, response latency was minimized to under 15 milliseconds through a 
 
 <img width="1248" height="696" alt="Screenshot 2026-06-09 at 10 04 06 PM" src="https://github.com/user-attachments/assets/61b5262f-9602-41b0-bed2-2d5bc4f8fabe" />
 
+<img width="1278" height="651" alt="Screenshot 2026-06-09 at 10 50 34 PM" src="https://github.com/user-attachments/assets/e90f6a2d-7b33-443d-8db8-15e7b6ac508c" />
+
+
 <img width="1248" height="696" alt="Screenshot 2026-06-09 at 10 06 35 PM" src="https://github.com/user-attachments/assets/b5f7ddc2-a9c0-43bd-ad9d-3b70821cae94" />
 
 <img width="1248" height="475" alt="Screenshot 2026-06-09 at 10 26 05 PM" src="https://github.com/user-attachments/assets/26ae979e-9dd6-4345-b8e7-a36e70729a94" />
 
-<img width="1248" height="696" alt="Screenshot 2026-06-09 at 10 07 09 PM" src="https://github.com/user-attachments/assets/85a4451c-f810-404c-a23d-e8eb032055a4" />
+<img width="1242" height="470" alt="Screenshot 2026-06-09 at 10 52 47 PM" src="https://github.com/user-attachments/assets/03c306ed-b9aa-440c-926b-7e2aa4bd8401" />
 
 # KPI INTELLIGENCE REPORTER — FULL SYSTEM ARCHITECTURE
 
