@@ -36,11 +36,17 @@ Additionally, response latency was minimized to under 15 milliseconds through a 
 
 ### 💻 Executive Access Portal & UI
 <img width="1248" height="690" alt="Screenshot 2026-06-09 at 10 02 11 PM" src="https://github.com/user-attachments/assets/67770a3f-c4b6-422f-8c7e-ea692cafacc9" />
+
 <img width="1248" height="690" alt="Screenshot 2026-06-09 at 10 02 46 PM" src="https://github.com/user-attachments/assets/69bb2efa-3099-423a-a22b-ba42cb7a7007" />
+
 <img width="1248" height="696" alt="Screenshot 2026-06-09 at 10 03 44 PM" src="https://github.com/user-attachments/assets/576a1712-28ee-4697-a528-c022d5600c6e" />
+
 <img width="1248" height="696" alt="Screenshot 2026-06-09 at 10 04 06 PM" src="https://github.com/user-attachments/assets/61b5262f-9602-41b0-bed2-2d5bc4f8fabe" />
+
 <img width="1248" height="696" alt="Screenshot 2026-06-09 at 10 06 35 PM" src="https://github.com/user-attachments/assets/b5f7ddc2-a9c0-43bd-ad9d-3b70821cae94" />
-https://github.com/user-attachments/assets/2f1eb0ab-b527-4758-9509-b756c3d3b24c
+
+<img width="1248" height="475" alt="Screenshot 2026-06-09 at 10 26 05 PM" src="https://github.com/user-attachments/assets/26ae979e-9dd6-4345-b8e7-a36e70729a94" />
+
 <img width="1248" height="696" alt="Screenshot 2026-06-09 at 10 07 09 PM" src="https://github.com/user-attachments/assets/85a4451c-f810-404c-a23d-e8eb032055a4" />
 
 # KPI INTELLIGENCE REPORTER — FULL SYSTEM ARCHITECTURE
