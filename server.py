@@ -8,6 +8,10 @@ import random
 import httpx
 import base64
 
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+
 from dotenv import load_dotenv
 from fpdf import FPDF
 
@@ -50,6 +54,9 @@ except Exception:
 from rag_engine import init_rag, get_rag_context
 init_rag(API_KEY)
 
+# Initialize Billing Module (Fix 5)
+from billing import check_usage_allowed, record_usage, create_checkout_url
+
 PORT = int(os.environ.get("PORT", 8000))
 MODEL_NAME = "gemini-2.5-flash"
 
@@ -91,11 +98,22 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="KPI Intelligence Reporter", lifespan=lifespan)
 
+# --- Rate Limiter (Fix 1) ---
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# --- CORS Hardening (Fix 3) ---
+ALLOWED_ORIGINS = [
+    "https://kpi-backend-dl16.onrender.com",
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
 
@@ -538,15 +556,37 @@ async def simulate_error():
     return {"status": "Simulated error initiated. Watch CodeMender live heal!"}
 
 @app.post("/api/generate")
+@limiter.limit("10/minute")
 async def generate_endpoint(request: Request):
     try:
+        # --- Input Validation (Fix 4) ---
+        content_length = request.headers.get('content-length', '0')
+        if int(content_length) > 2 * 1024 * 1024:  # 2MB max
+            return JSONResponse(status_code=413, content={"error": "Payload too large. Maximum 2MB allowed."})
+
         body = await request.json()
         m_data = body.get('marketingData', [])
         p_data = body.get('productData', [])
         question = body.get('question', 'Analyze the given data.')
 
+        MAX_ROWS = 500
+        if len(m_data) > MAX_ROWS or len(p_data) > MAX_ROWS:
+            return JSONResponse(status_code=400, content={"error": f"Too many rows. Maximum {MAX_ROWS} rows per table."})
+        if len(question) > 2000:
+            return JSONResponse(status_code=400, content={"error": "Question too long. Maximum 2000 characters."})
+
         if not API_KEY or API_KEY == "YOUR_API_KEY_HERE":
             return JSONResponse(status_code=500, content={"error": "Server misconfiguration: GEMINI_API_KEY is not set in backend."})
+
+        # --- Billing Gate (Fix 5) ---
+        user_email = body.get('userEmail', 'guest@boardroom.com')
+        usage = check_usage_allowed(user_email)
+        if not usage["allowed"]:
+            return JSONResponse(status_code=402, content={
+                "error": usage["message"],
+                "tier": usage["tier"],
+                "upgrade_url": create_checkout_url(user_email)
+            })
         
         csv_summary = {"marketing_data": m_data, "product_data": p_data}
         
@@ -710,6 +750,27 @@ async def integrations_sync_endpoint(request: Request):
     except Exception as e:
         logger.error(f"Error during integration sync: {e}")
         return JSONResponse(status_code=500, content={"error": str(e)})
+
+# -------------------------------------------------------------------
+# Billing API Endpoints (Fix 5)
+# -------------------------------------------------------------------
+@app.post("/api/billing/status")
+async def billing_status(request: Request):
+    """Check a user's billing tier and remaining free reports."""
+    body = await request.json()
+    user_email = body.get('email', 'guest@boardroom.com')
+    usage = check_usage_allowed(user_email)
+    return usage
+
+@app.post("/api/billing/checkout")
+async def billing_checkout(request: Request):
+    """Create a Stripe Checkout session for upgrading to Pro."""
+    body = await request.json()
+    user_email = body.get('email', 'guest@boardroom.com')
+    url = create_checkout_url(user_email)
+    if not url:
+        return JSONResponse(status_code=503, content={"error": "Billing not configured. Set STRIPE_SECRET_KEY in environment."})
+    return {"checkout_url": url}
 
 if __name__ == '__main__':
     uvicorn.run("server:app", host="0.0.0.0", port=PORT, reload=False)

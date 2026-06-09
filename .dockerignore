@@ -1,0 +1,8 @@
+__pycache__/
+.pytest_cache/
+.git/
+.env
+*.pyc
+reports/
+server_master.py
+.github/
