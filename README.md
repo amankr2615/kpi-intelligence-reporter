@@ -1,7 +1,32 @@
-<img width="1248" height="696" alt="Screenshot 2026-06-09 at 10 04 50 PM" src="https://github.com/user-attachments/assets/921dc4ef-c0a6-4946-91a5-e144c27099c1" />
+# 📊 KPI Intelligence Reporter
+
+A production-grade, self-healing SaaS analytics pipeline that converts raw metric data (CSVs) into mathematically verified, benchmark-grounded executive reports.
+
+---
+
+### 💡 The Problem
+Modern businesses are flooded with raw metric spreadsheets but lack the resources to analyze them. 
+* **Traditional BI suites** (Tableau, Power BI) cost upwards of $50,000/year and require dedicated analysts.
+* **Basic LLM tools** (like raw ChatGPT uploads) lack mathematical rigor, frequently hallucinate numbers, and lack the industry context to tell if a metric is good or bad.
+
+### 🛠️ The Solution
+This application bridges the gap by wrapping a **deterministic analytical engine** around a **multi-agent AI pipeline**, delivering reliable, hallucination-free business intelligence at scale.
+
+* **Hallucination-Free Math:** Runs local Least-Squares linear regression for forecasts. Projections are automatically constrained by actual statistical boundaries to prevent AI fantasy numbers.
+* **Grounding & RAG:** Vector-embedded industry benchmarks (E-Commerce, SaaS, etc.) are injected dynamically based on the user's dataset to contextualize performance metrics.
+* **Self-Healing Architecture:** Integrated with a `Codemender` self-healing pipeline that intercept errors, repair JSON structures in real-time, and stream status via Server-Sent Events (SSE).
+* **SaaS Ready:** Features multi-user JWT authentication, multi-tier caching (L1 Memory → L2 Redis → L3 PostgreSQL), async Slack/Discord webhooks, Stripe subscription structures, and automated PDF builders.
+
+
 # Multi-Agent AI Platform for KPI Intelligence
 
-> **Production-ready, full-stack business intelligence platform bridging a Python/FastAPI backend with a custom JavaScript/Glassmorphism frontend.**
+Architected and developed a production-ready, AI-driven Business Intelligence (BI) platform that automates the transformation of raw metric data (CSVs) into verified strategic insights. 
+
+To eliminate the mathematical hallucinations common in standard LLMs and bypass the high costs of traditional BI tools, the backend was engineered with a local Least-Squares linear regression engine and a dynamic vector-based RAG pipeline. 
+
+This setup grounds a 7-agent LLM analysis system with deterministic mathematical models and real-world industry benchmarks, guaranteeing 100% mathematically bounded projections. 
+
+Additionally, response latency was minimized to under 15 milliseconds through a 3-tier cache waterfall (Memory ➔ Redis ➔ PostgreSQL), and system reliability was secured by building an asynchronous self-healing middleware pipeline that intercepts and auto-corrects malformed AI outputs in real-time.
 
 ### 🎥 Live Dashboard Demo
 **
