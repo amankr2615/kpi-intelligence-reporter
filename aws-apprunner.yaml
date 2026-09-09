@@ -1,0 +1,17 @@
+version: 1.0
+runtime: python311
+build:
+  commands:
+    build:
+      - pip install --no-cache-dir -r requirements.txt
+run:
+  command: python server.py
+  network:
+    port: 8000
+    env: PORT
+  health-check:
+    path: /health
+    interval: 10
+    timeout: 5
+    healthy-threshold: 2
+    unhealthy-threshold: 5
