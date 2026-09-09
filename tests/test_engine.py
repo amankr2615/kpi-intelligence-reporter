@@ -89,3 +89,22 @@ def test_styles_css_endpoint():
 def test_script_js_endpoint():
     response = client.get("/script.js")
     assert response.status_code == 200
+
+# -------------------------------------------------------------------
+# LangGraph Pipeline Test
+# -------------------------------------------------------------------
+
+def test_langgraph_pipeline_execution():
+    from langgraph_pipeline import langgraph_app
+    initial_state = {
+        "csv_summary": {
+            "marketing_data": [{"spend": 100, "revenue": 300}],
+            "product_data": [{"revenue": 500}]
+        },
+        "question": "What is the ROI?"
+    }
+    result = langgraph_app.invoke(initial_state)
+    assert "data_stats" in result
+    assert "forecast_stats" in result
+    assert "rag_context" in result
+

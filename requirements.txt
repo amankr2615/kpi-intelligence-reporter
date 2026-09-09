@@ -11,3 +11,5 @@ sentry-sdk
 slowapi
 stripe
 pytest
+langchain-core
+langgraph
