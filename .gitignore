@@ -16,8 +16,10 @@ reports/
 # Python cache artifacts
 __pycache__/
 .pytest_cache/
+venv/
 
 # Binary & media artifacts
+
 *.mov
 *.png
 Aman__Kumar_IIT_Patna.pdf
